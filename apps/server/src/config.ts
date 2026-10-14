@@ -1,9 +1,16 @@
 import { z } from 'zod';
 
+const webOrigin = z.string().url().refine(value => {
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password && url.pathname === '/' && !url.search && !url.hash;
+  } catch { return false; }
+}, 'WEB_ORIGIN doit être une origine HTTP(S), sans chemin, identifiants ni paramètres.').transform(value => new URL(value).origin);
+
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   HOST: z.string().default('0.0.0.0'), PORT: z.coerce.number().int().min(0).max(65535).default(3001),
-  WEB_ORIGIN: z.string().url().default('http://localhost:5173'),
+  WEB_ORIGIN: webOrigin.default('http://localhost:5173'),
   DATABASE_URL: z.string().optional(), COOKIE_SECURE: z.enum(['true', 'false']).optional(),
   TRUST_PROXY: z.string().optional(),
   LIVEKIT_URL: z.string().url().optional(), LIVEKIT_API_URL: z.string().url().optional(),

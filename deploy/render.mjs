@@ -51,7 +51,7 @@ export function configuration() {
           handle: [{ handler: 'tls' }, { handler: 'proxy', proxy_protocol: 'v2', upstreams: [{ dial: ['livekit:443'] }] }],
         }] }, { wrapper: 'tls' }],
         routes: [
-          { match: [{ host: [appDomain] }], handle: [{ handler: 'reverse_proxy', upstreams: [{ dial: 'app:3001' }] }], terminal: true },
+          { match: [{ host: [appDomain] }], handle: [{ handler: 'reverse_proxy', upstreams: [{ dial: 'app:8080' }] }], terminal: true },
           { match: [{ host: [voiceDomain] }], handle: [{ handler: 'reverse_proxy', upstreams: [{ dial: 'livekit:7880' }] }], terminal: true },
         ],
       } } },

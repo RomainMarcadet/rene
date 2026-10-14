@@ -1,0 +1,21 @@
+# Import these two site blocks into the EXISTING Caddy configuration.
+# Replace domains to match .env.caddy exactly. Do not replace the other sites/global options.
+# Container Caddy: targets below are aliases on CADDY_NETWORK (web by default).
+# Host Caddy: replace targets with 127.0.0.1:8080 and 127.0.0.1:7880
+# (or the HTTP ports chosen in .env.caddy).
+# Remote Caddy: use the Docker host's restricted LAN address and published HTTP ports.
+
+rene.example.com {
+	# For an internal domain, enable this and trust Caddy's root CA on every player device:
+	# tls internal
+	# Or use certificates already managed on the Caddy host:
+	# tls /path/to/fullchain.pem /path/to/privkey.pem
+	reverse_proxy rene:8080
+}
+
+voice.example.com {
+	# Choose the same certificate strategy as the RENÉ site:
+	# tls internal
+	# tls /path/to/fullchain.pem /path/to/privkey.pem
+	reverse_proxy rene-livekit:7880
+}

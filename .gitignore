@@ -4,6 +4,7 @@ dist/
 .env.*
 !.env.example
 !.env.production.example
+!.env.caddy.example
 .DS_Store
 coverage/
 playwright-report/

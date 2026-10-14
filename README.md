@@ -31,7 +31,7 @@ Pour lancer aussi l'application compilée dans Docker :
 docker compose --profile app up --build -d
 ```
 
-Ouvrir alors **http://localhost:3001**, sans lancer `npm run dev` en parallèle. Les migrations s'appliquent au démarrage du conteneur applicatif. Les volumes conservent PostgreSQL après `docker compose down` ; `down -v` les supprime.
+Ouvrir alors **http://localhost:8080**, sans lancer `npm run dev` en parallèle. Les migrations s'appliquent au démarrage du conteneur applicatif. Les volumes conservent PostgreSQL après `docker compose down` ; `down -v` les supprime.
 
 ## Jouer à plusieurs
 
@@ -48,6 +48,8 @@ Pour tester quatre joueurs sur un même ordinateur, utiliser **quatre profils de
 
 `localhost` désigne l'ordinateur de chaque personne : il ne faut pas envoyer un lien localhost à des amis distants. Pour un essai sur le réseau local, utiliser l'adresse LAN du serveur pour le lien et `WEB_ORIGIN`, et adapter `LIVEKIT_URL` ainsi que `rtc.node_ip` dans `deploy/livekit.dev.yaml`. Les navigateurs demandent un contexte sécurisé pour le microphone : utiliser le déploiement HTTPS pour la recette multiappareil avec vocal.
 
+Si `/api/session` répond `200` mais que le salon ne se connecte pas, vérifier **l'adresse réellement ouverte dans le navigateur** : elle doit correspondre à `WEB_ORIGIN` (protocole, hôte et port, sans chemin). Par exemple, pour `http://192.168.1.50:5173`, définir cette même valeur puis redémarrer `npm run dev`. Le proxy doit conserver l'en-tête `Host`. Le serveur journalise l'origine attendue au démarrage et les refus de connexion temps réel. Vite conserve désormais le port 5173 au lieu d'en choisir silencieusement un autre s'il est occupé.
+
 ## Commandes
 
 | Commande | Effet |
@@ -63,14 +65,16 @@ Pour tester quatre joueurs sur un même ordinateur, utiliser **quatre profils de
 
 Le résultat des tests locaux et les vérifications restant à réaliser sont décrits dans [la recette](docs/acceptance.md). La CI prépare PostgreSQL, contrôle le code et exécute les tests navigateur. Aucun workflow ne publie d'image ni ne déploie automatiquement.
 
-À ce stade, **60 tests passent**, ainsi que le contrôle TypeScript complet, le lint et les builds client/serveur. Les tests HTTP utilisent les vrais plugins Fastify. Les tests Socket.IO restent bloqués par l'interdiction d'ouvrir un port dans l'environnement de création ; les parcours navigateur, le rendu 3D et le vocal restent à vérifier selon la recette.
+À ce stade, **77 tests passent**, ainsi que le contrôle TypeScript complet, le lint et les builds client/serveur (`npm run check`). Les six tests réseau Socket.IO utilisent de vrais clients et couvrent notamment une partie complète à quatre, les votes invalides, les mots privés, la reconnexion et la préparation d'une nouvelle partie. Une recette manuelle a confirmé le salon 3D dans Comet et Safari. La partie à quatre personnes sur leurs appareils et le vocal restent à vérifier selon la recette.
+
+L'image Docker sur le **port 8080** a également été compilée et testée dans une pile isolée avec PostgreSQL et Caddy 2.11.4 : migrations, frontend/API en HTTPS, quatre clients Socket.IO (polling et WebSocket), chat et cookies invités sont validés. Les certificats de cette recette sont internes ; le vocal reste à vérifier sur le serveur réel. Voir [les preuves de cette recette Docker/Caddy](docs/acceptance.md).
 
 ## Configuration
 
 | Variable | Valeur / usage |
 | --- | --- |
 | `NODE_ENV` | `development`, `test` ou `production` |
-| `HOST`, `PORT` | `0.0.0.0`, `3001` par défaut |
+| `HOST`, `PORT` | `0.0.0.0` ; `3001` pour le développement Node, `8080` dans l'image Docker |
 | `WEB_ORIGIN` | Origine exacte du navigateur, `http://localhost:5173` en développement |
 | `COOKIE_SECURE` | `false` en local HTTP ; obligatoire en production HTTPS |
 | `POSTGRES_PORT` | Port hôte du PostgreSQL Docker de développement, `5433` par défaut ; utilisé par Compose |
@@ -85,7 +89,18 @@ Configurer les quatre variables LiveKit ensemble ou les omettre ensemble. Aucun 
 
 ## Héberger pour ses amis
 
-La procédure détaillée se trouve dans [déploiement et exploitation](docs/deployment.md). Elle fournit PostgreSQL, l'application, LiveKit, HTTPS et TURN/TLS derrière Caddy sur une seule adresse IPv4 publique.
+**Avec votre Caddy existant en conteneur**, RENÉ écoute en HTTP sur le **port 8080 de son conteneur**, avec l'alias **`rene`** sur le réseau externe **`web`**. Le proxy existant peut donc joindre `rene:8080`. Les paramètres propres à RENÉ se trouvent dans `.env.caddy` ; le [guide dédié](docs/caddy-existing.md) décrit les variantes de déploiement.
+
+```sh
+cp .env.caddy.example .env.caddy
+# Renseigner domaines, IP, secrets et RENE_TRUST_PROXY (adresse/réseau Docker du Caddy).
+docker run --rm --env-file .env.caddy -v "${PWD}:/work" -w /work node:24-bookworm-slim node deploy/render-existing-caddy.mjs
+docker compose --env-file .env.caddy -f compose.existing-caddy.yml -f compose.existing-caddy.network.yml up --build -d
+```
+
+Cette procédure utilise uniquement Docker sur le serveur. Le réseau `web` doit déjà être partagé avec Caddy ; changer `CADDY_NETWORK` s'il porte un autre nom. Le fichier `deploy/Caddyfile.rene.example` sert de référence si un bloc de site est nécessaire. Le vocal utilise `rene-livekit:7880` pour HTTPS/WSS et les ports **7882/UDP** et **7881/TCP** pour les médias. Pour Caddy installé sur l'hôte, utiliser le fichier de base seul : RENÉ est publié sur `127.0.0.1:8080` et LiveKit sur `127.0.0.1:7880`.
+
+Pour une installation autonome avec son propre Caddy, la procédure [déploiement et exploitation](docs/deployment.md) fournit également HTTPS et TURN/TLS sur une seule adresse IPv4 publique. Ces deux modes de déploiement sont des alternatives.
 
 ```sh
 cp .env.production.example .env.production

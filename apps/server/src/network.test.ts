@@ -11,10 +11,13 @@ type Actor = { socket: Client; playerId: string; cookie: string; snapshot?: Room
 const origin = 'http://localhost:5173';
 const apps: Running[] = []; const clients: Client[] = [];
 afterEach(async () => { for (const client of clients.splice(0)) client.disconnect(); for (const running of apps.splice(0)) await running.app.close(); });
-async function server(persistence?: Persistence) {
-  const running = await createApp({ config: readConfig({ NODE_ENV: 'test', WEB_ORIGIN: origin }), logger: false, timers: false, persistence });
+async function server(persistence?: Persistence, useListeningOrigin = false) {
+  const config = readConfig({ NODE_ENV: 'test', WEB_ORIGIN: origin });
+  const running = await createApp({ config, logger: false, timers: false, persistence });
   apps.push(running);
   const url = await running.app.listen({ port: 0, host: '127.0.0.1' });
+  // The OS assigns the port. Finalize the canonical origin before making requests.
+  if (useListeningOrigin) config.WEB_ORIGIN = url;
   return { running, url };
 }
 async function actor(running: Running, url: string, previous?: { cookie: string; playerId: string }) {
@@ -53,11 +56,24 @@ async function expire(running: Running, room: ReturnType<Running['rooms']['requi
 }
 
 describe('real Socket.IO clients', () => {
+  it('accepts authenticated polling without Origin or Fetch Metadata on the configured host', async () => {
+    const { running, url } = await server(undefined, true);
+    const session = await running.app.inject({ method: 'GET', url: '/api/session' });
+    const cookie = String(session.headers['set-cookie']).split(';')[0];
+    const socket: Client = io(url, { transports: ['polling'], autoConnect: false, reconnection: false, extraHeaders: { Cookie: cookie } });
+    clients.push(socket);
+    await new Promise<void>((resolve, reject) => { socket.once('connect', resolve); socket.once('connect_error', reject); socket.connect(); });
+    const ack = await send({ socket, cookie, playerId: session.json().playerId }, { type: 'room.create', name: 'René LAN', appearance: DEFAULT_APPEARANCE });
+    expect(ack.ok).toBe(true);
+    expect(socket.io.engine.transport.name).toBe('polling');
+  });
+
   it('plays, rejects cheating and replays after a complete four-client game', async () => {
     const { running, actors, room } = await opened();
     expect((await send(actors[1], { type: 'game.start' })).ok).toBe(false);
     for (const a of actors) expect((await send(a, { type: 'player.ready', ready: true })).ok).toBe(true);
-    expect((await send(actors[0], { type: 'game.start' })).ok).toBe(true);
+    const started = await send(actors[0], { type: 'game.start' });
+    expect(started, started.ok ? undefined : started.error).toMatchObject({ ok: true });
     await expect.poll(() => actors.every(a => a.secret?.inGame)).toBe(true);
     for (const a of actors) {
       expect(a.secret).not.toHaveProperty('role');
@@ -94,7 +110,8 @@ describe('real Socket.IO clients', () => {
   it('recovers the same place after refresh and replaces a second controlling connection', async () => {
     const { running, url, actors, room } = await opened();
     for (const a of actors) await send(a, { type: 'player.ready', ready: true });
-    await send(actors[0], { type: 'game.start' });
+    const started = await send(actors[0], { type: 'game.start' });
+    expect(started, started.ok ? undefined : started.error).toMatchObject({ ok: true });
     const old = actors[1];
     await expect.poll(() => old.secret?.inGame).toBe(true);
     const word = old.secret!.word; old.socket.disconnect();

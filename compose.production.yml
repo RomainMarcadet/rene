@@ -27,7 +27,7 @@ services:
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
-      PORT: 3001
+      PORT: 8080
       COOKIE_SECURE: "true"
       WEB_ORIGIN: https://${RENE_DOMAIN:?Set RENE_DOMAIN}
       TRUST_PROXY: ${RENE_NETWORK_SUBNET:-172.30.92.0/24}

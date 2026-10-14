@@ -73,7 +73,18 @@ export function initialize() {
         void send({ type: 'room.resume' }, true);
       });
       socket.on('disconnect', () => useGame.setState({ connected: false }));
-      socket.on('connect_error', () => { useGame.setState({ connected: false }); if (!socket?.active) scheduleRetry(); });
+      socket.on('connect_error', error => {
+        if (replaced) return;
+        if (!socket?.active) scheduleRetry();
+        // Only known application messages are suitable for the player-facing UI.
+        // Transport errors can contain implementation details from the browser or proxy.
+        const connectionMessage = error.message === 'Session expirée. Recharge la page.'
+          ? 'Votre session a expiré. Rechargez la page ou réessayez.'
+          : error.message === 'Connexion momentanément indisponible.'
+            ? 'Le salon est momentanément indisponible. Réessayez dans un instant.'
+            : 'Impossible de se connecter au salon pour le moment. Réessayez dans un instant.';
+        useGame.setState({ connected: false, connectionMessage });
+      });
       socket.on('snapshot', room => {
         const previous = useGame.getState().room;
         useGame.setState({ room, offset: room.serverNow - Date.now(), ...(previous?.game?.id !== room.game?.id ? { secret: null } : {}) });

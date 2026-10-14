@@ -5,6 +5,7 @@
 .env.*
 !.env.example
 !.env.production.example
+!.env.caddy.example
 node_modules
 **/node_modules
 **/dist

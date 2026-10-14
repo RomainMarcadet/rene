@@ -15,7 +15,8 @@ export interface Room {
 }
 export interface RoomStore { get(code: string): Room | undefined; set(code: string, room: Room): void; delete(code: string): void; values(): IterableIterator<Room>; readonly size: number }
 export class MemoryRoomStore extends Map<string, Room> implements RoomStore {}
-const secureRandom = () => randomInt(0, 2 ** 48) / 2 ** 48;
+// crypto.randomInt requires a range strictly smaller than 2 ** 48.
+const secureRandom = () => randomInt(0, 2 ** 32) / 2 ** 32;
 const editable = (room: Room) => !room.game || room.game.phase === 'results';
 
 /** Every transport mutation is queued by player/room before entering this service. */

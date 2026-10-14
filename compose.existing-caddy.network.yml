@@ -1,0 +1,18 @@
+# Merge with compose.existing-caddy.yml when Caddy runs in Docker on the same host.
+# Requires Docker Compose >= 2.24.4 for !override.
+services:
+  app:
+    ports: !reset []
+    networks:
+      proxy:
+        aliases: [rene]
+  livekit:
+    # Keep the media ports, removing the HTTP host publication from the base file.
+    ports: !override ["7881:7881/tcp", "7882:7882/udp"]
+    networks:
+      proxy:
+        aliases: [rene-livekit]
+networks:
+  proxy:
+    external: true
+    name: ${CADDY_NETWORK:-web}

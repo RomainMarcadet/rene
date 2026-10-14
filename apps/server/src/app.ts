@@ -12,6 +12,7 @@ import { readConfig, type Config } from './config.js';
 import { Rooms, MemoryRoomStore, type Room } from './rooms.js';
 import { SerialQueue, TokenBucket } from './queue.js';
 import { VoiceService } from './voice.js';
+import { allowsRealtimeRequest } from './origin.js';
 
 const COOKIE = 'rene_guest';
 const hash = (token: string) => createHash('sha256').update(token).digest('hex');
@@ -78,7 +79,11 @@ export async function createApp(options: AppOptions = {}) {
 
   const io = new Server<ClientEvents, ServerEvents>(app.server, {
     maxHttpBufferSize: 8192, cors: { origin: config.WEB_ORIGIN, credentials: true },
-    allowRequest: (request, callback) => callback(null, sameOrigin(request.headers.origin) || (!request.headers.origin && request.headers['sec-fetch-site'] === 'same-origin')),
+    allowRequest: (request, callback) => {
+      const allowed = allowsRealtimeRequest(request.headers, config.WEB_ORIGIN);
+      if (!allowed) app.log.warn({ origin: request.headers.origin ?? null, host: request.headers.host, expectedOrigin: config.WEB_ORIGIN }, 'Connexion temps réel refusée : vérifier WEB_ORIGIN et le Host transmis par le proxy');
+      callback(allowed ? null : 'Origine non autorisée.', allowed);
+    },
     // Recovery uses authenticated snapshots, never stale socket room memberships.
   });
   io.use(async (socket, next) => {

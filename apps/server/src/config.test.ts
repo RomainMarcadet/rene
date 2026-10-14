@@ -3,6 +3,12 @@ import { readConfig } from './config.js';
 
 describe('deployment configuration', () => {
   const production = { NODE_ENV: 'production', WEB_ORIGIN: 'https://rene.example.com', DATABASE_URL: 'postgresql://example.invalid/rene' };
+  it('normalizes an origin and rejects URLs with paths or credentials', () => {
+    expect(readConfig({ WEB_ORIGIN: 'https://rene.example.com:443/' }).WEB_ORIGIN).toBe('https://rene.example.com');
+    for (const WEB_ORIGIN of ['invalid-url', 'https://rene.example.com/rene', 'https://user:pass@rene.example.com', 'https://rene.example.com/?room=ABCDEF', 'https://rene.example.com/#room', 'ftp://rene.example.com']) {
+      expect(() => readConfig({ WEB_ORIGIN })).toThrow('WEB_ORIGIN');
+    }
+  });
   it('supports explicit local mode and never implicitly loses production data', () => {
     expect(readConfig({ NODE_ENV: 'development', DATABASE_URL: '' })).toMatchObject({ voiceEnabled: false, secureCookies: false });
     expect(() => readConfig({ NODE_ENV: 'production' })).toThrow('DATABASE_URL');
