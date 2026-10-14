@@ -1,0 +1,42 @@
+name: rene-dev
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: rene
+      POSTGRES_PASSWORD: rene_local_only
+      POSTGRES_DB: rene
+    ports: ["127.0.0.1:${POSTGRES_PORT:-5433}:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rene -d rene"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  livekit:
+    image: livekit/livekit-server:v1.13.9
+    command: ["--config", "/etc/livekit.yaml"]
+    ports: ["127.0.0.1:7880:7880", "7881:7881/tcp", "7882:7882/udp"]
+    volumes: ["./deploy/livekit.dev.yaml:/etc/livekit.yaml:ro"]
+  app:
+    profiles: ["app"]
+    build: .
+    init: true
+    command: ["sh", "-c", "npm run db:migrate && exec node apps/server/dist/index.js"]
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      PORT: 3001
+      COOKIE_SECURE: "false"
+      WEB_ORIGIN: http://localhost:3001
+      DATABASE_URL: postgresql://rene:rene_local_only@postgres:5432/rene?schema=public
+      LIVEKIT_URL: ws://localhost:7880
+      LIVEKIT_API_URL: http://livekit:7880
+      LIVEKIT_API_KEY: rene_dev
+      LIVEKIT_API_SECRET: rene_development_secret_not_for_production
+    ports: ["127.0.0.1:3001:3001"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      livekit: { condition: service_started }
+volumes:
+  postgres_data:

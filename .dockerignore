@@ -1,0 +1,17 @@
+.git
+.local
+.DS_Store
+.env
+.env.*
+!.env.example
+!.env.production.example
+node_modules
+**/node_modules
+**/dist
+coverage
+test-results
+playwright-report
+deploy/generated
+*.dump
+inspo
+regles

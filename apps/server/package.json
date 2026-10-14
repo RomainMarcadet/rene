@@ -1,0 +1,6 @@
+{
+  "name":"@rene/server","version":"0.1.0","private":true,"type":"module",
+  "scripts":{"dev":"tsx watch --env-file-if-exists=../../.env src/index.ts","build":"tsup --config tsup.config.ts","start":"node --env-file-if-exists=../../.env dist/index.js"},
+  "dependencies":{"@rene/contracts":"0.1.0","@rene/engine":"0.1.0","@fastify/cookie":"^11.0.2","@fastify/static":"^10.1.6","@fastify/rate-limit":"^10.3.0","@prisma/client":"6.19.3","fastify":"^5.6.2","socket.io":"^4.8.1","livekit-server-sdk":"^2.14.0","zod":"^3.25.76"},
+  "devDependencies":{"tsup":"^8.5.0","socket.io-client":"^4.8.1"}
+}
