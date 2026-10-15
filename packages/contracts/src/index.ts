@@ -22,6 +22,16 @@ export type Role = 'civilian' | 'undercover' | 'white';
 export type Phase = 'reveal' | 'description' | 'discussion' | 'vote' | 'tiebreak' | 'elimination' | 'whiteGuess' | 'results';
 export type Winner = 'civilians' | 'infiltrators' | 'white';
 export type Emote = 'wave' | 'dance' | 'suspect';
+export const EMOTE_DURATION_MS = 3500;
+export const EMOTE_COOLDOWN_MS = 2000;
+export const emoteDuration = (kind: Emote) => kind === 'dance' ? 2500 : EMOTE_DURATION_MS;
+/** Server and client use the same phase policy; spectators are also still during votes. */
+export function canMoveInPhase(phase?: Phase) { return phase !== 'vote' && phase !== 'tiebreak'; }
+export function voteSeat(index: number, count: number): Position {
+  const angle = index / Math.max(1, count) * Math.PI * 2;
+  const x = Math.cos(angle) * 2.75; const z = Math.sin(angle) * 2.75;
+  return { x, z, yaw: Math.atan2(-x, -z) };
+}
 export interface Position { x: number; z: number; yaw: number }
 export interface PublicPlayer { id: string; name: string; appearance: AvatarAppearance; connected: boolean; ready: boolean; position: Position; alive: boolean; waiting: boolean; role?: Role; score: number; emote?: { kind: Emote; until: number } }
 export interface Description { playerId: string; text: string; round: number; timedOut: boolean }

@@ -3,27 +3,29 @@ import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import { MathUtils, type Group, type Mesh } from 'three';
 import type { AvatarAppearance, Emote } from '@rene/contracts';
+import { avatarPose } from './animation';
 const ink = '#191719';
 function Ball({ at, scale = [1, 1, 1], color }: { at: [number, number, number]; scale?: [number, number, number]; color: string }) { return <mesh position={at} scale={scale}><sphereGeometry args={[1, 12, 10]} /><meshLambertMaterial color={color} flatShading /></mesh>; }
-export function Avatar({ appearance: a, position = [0, 0, 0], yaw = 0, name, speaking, selected, dead, winner, emote, emoteUntil, onClick, reducedMotion = false }: { appearance: AvatarAppearance; position?: [number, number, number]; yaw?: number; name?: string; speaking?: boolean; selected?: boolean; dead?: boolean; winner?: boolean; emote?: Emote; emoteUntil?: number; onClick?: () => void; reducedMotion?: boolean }) {
+export function Avatar({ appearance: a, position = [0, 0, 0], yaw = 0, name, speaking, selected, dead, winner, emote, emoteUntil, onClick, seated = false, reducedMotion = false }: { appearance: AvatarAppearance; position?: [number, number, number]; yaw?: number; name?: string; speaking?: boolean; selected?: boolean; dead?: boolean; winner?: boolean; emote?: Emote; emoteUntil?: number; onClick?: () => void; seated?: boolean; reducedMotion?: boolean }) {
   const initialPosition = useRef(position);
   const group = useRef<Group>(null); const puppet = useRef<Group>(null); const head = useRef<Group>(null); const leftArm = useRef<Group>(null); const rightArm = useRef<Group>(null); const leftFoot = useRef<Mesh>(null); const rightFoot = useRef<Mesh>(null);
   useFrame((state, dt) => {
     if (!group.current || !puppet.current) return;
     const time = state.clock.elapsedTime; const moving = Math.abs(group.current.position.x - position[0]) + Math.abs(group.current.position.z - position[2]) > .08;
-    group.current.position.x = MathUtils.damp(group.current.position.x, position[0], 14, dt); group.current.position.z = MathUtils.damp(group.current.position.z, position[2], 14, dt);
+    group.current.position.x = MathUtils.damp(group.current.position.x, position[0], seated ? 4 : 14, dt); group.current.position.z = MathUtils.damp(group.current.position.z, position[2], seated ? 4 : 14, dt);
     const targetYaw = group.current.rotation.y + Math.atan2(Math.sin(yaw - group.current.rotation.y), Math.cos(yaw - group.current.rotation.y));
     group.current.rotation.y = MathUtils.damp(group.current.rotation.y, targetYaw, 9, dt);
-    if (reducedMotion) { puppet.current.position.y = 0; puppet.current.rotation.z = dead ? -.35 : 0; return; }
-    const activeEmote = !emoteUntil || Date.now() < emoteUntil ? emote : undefined;
-    const dance = activeEmote === 'dance' || winner;
-    puppet.current.position.y = MathUtils.damp(puppet.current.position.y, dead ? -.55 : moving ? Math.abs(Math.sin(time * 12)) * .12 : dance ? Math.abs(Math.sin(time * 7)) * .24 : 0, 10, dt);
-    puppet.current.rotation.z = MathUtils.damp(puppet.current.rotation.z, dead ? -1.2 : dance ? Math.sin(time * 7) * .17 : 0, 6, dt);
-    if (head.current) head.current.rotation.z = Math.sin(time * (activeEmote === 'suspect' ? 8 : 2)) * (activeEmote === 'suspect' ? .15 : .03);
-    if (leftArm.current) leftArm.current.rotation.x = moving ? Math.sin(time * 12) * .55 : dance ? Math.sin(time * 8) * 1.2 : .08;
-    if (rightArm.current) { rightArm.current.rotation.x = moving ? -Math.sin(time * 12) * .55 : 0; rightArm.current.rotation.z = activeEmote === 'wave' ? -2.2 + Math.sin(time * 12) * .4 : dance ? -.9 : -.08; }
-    if (leftFoot.current) leftFoot.current.rotation.x = moving ? Math.sin(time * 12) * .35 : 0;
-    if (rightFoot.current) rightFoot.current.rotation.x = moving ? -Math.sin(time * 12) * .35 : 0;
+    const pose = avatarPose({ time, now: Date.now(), moving, dead, winner, emote, until: emoteUntil, reduced: reducedMotion });
+    puppet.current.position.y = MathUtils.damp(puppet.current.position.y, pose.y, 10, dt);
+    puppet.current.position.z = MathUtils.damp(puppet.current.position.z, pose.z, 10, dt);
+    puppet.current.rotation.z = MathUtils.damp(puppet.current.rotation.z, pose.roll, 6, dt);
+    puppet.current.rotation.y = MathUtils.damp(puppet.current.rotation.y, pose.yaw, 9, dt);
+    if (head.current) head.current.rotation.set(pose.headX, pose.headY, pose.headZ);
+    if (leftArm.current) leftArm.current.rotation.set(pose.leftX, 0, pose.leftZ);
+    if (rightArm.current) { rightArm.current.rotation.set(pose.rightX, 0, pose.rightZ); rightArm.current.scale.y = pose.rightScale; rightArm.current.position.y = 1 + pose.rightLift; }
+    if (leftFoot.current) leftFoot.current.rotation.x = pose.leftFoot;
+    if (rightFoot.current) rightFoot.current.rotation.x = pose.rightFoot;
+
   });
   return <group ref={group} position={initialPosition.current} onClick={onClick ? event => { event.stopPropagation(); onClick(); } : undefined}>
     {(speaking || selected) && <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .025, 0]}><ringGeometry args={[.7, .8, 32]} /><meshBasicMaterial color={speaking ? '#65B847' : '#F5E742'} /></mesh>}

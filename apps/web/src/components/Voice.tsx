@@ -1,51 +1,60 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Room } from 'livekit-client';
-import type { VoiceCredentials } from '@rene/contracts';
-import { notify, useGame } from '../store';
+import { useGame } from '../store';
+import { isEditing } from '../keyboard';
+import { useVoiceConnection } from '../voice/useVoiceConnection';
+
+type MicrophoneMode = 'ptt' | 'open';
 export function Voice({ generation }: { generation: number }) {
-  const available = useGame(s => s.session?.voiceEnabled); const muted = useGame(s => s.muted);
-  const [enabled, setEnabled] = useState(false); const [connected, setConnected] = useState(false);
-  const [microphone, setMicrophone] = useState(true); const [canPublish, setCanPublish] = useState(false);
-  const [status, setStatus] = useState(''); const [audioBlocked, setAudioBlocked] = useState(false);
-  const room = useRef<Room | null>(null); const microphoneWanted = useRef(true); const audio = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!enabled) return;
-    let cancelled = false; let activeRoom: Room | null = null; const request = new AbortController();
-    setConnected(false); setStatus('Connexion au vocal…');
-    void (async () => {
-      try {
-        const { Room: LiveRoom, RoomEvent, Track } = await import('livekit-client');
-        const response = await fetch('/api/voice', { method: 'POST', credentials: 'same-origin', signal: request.signal });
-        if (!response.ok) { const error = await response.json().catch(() => null); throw new Error(error?.error || 'Le vocal est momentanément indisponible. Le chat reste ouvert.'); }
-        const credentials: VoiceCredentials = await response.json();
-        if (cancelled) return;
-        if (credentials.generation !== generation) { setStatus('Le salon vocal change. Synchronisation en cours…'); return; }
-        activeRoom = new LiveRoom({ adaptiveStream: true, dynacast: true }); room.current = activeRoom;
-        activeRoom.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
-          if (track.kind === Track.Kind.Audio) { const element = track.attach(); element.dataset.participant = participant.identity; element.muted = useGame.getState().muted.includes(participant.identity); audio.current?.appendChild(element); }
-        });
-        activeRoom.on(RoomEvent.TrackUnsubscribed, track => track.detach().forEach(element => element.remove()));
-        activeRoom.on(RoomEvent.ActiveSpeakersChanged, speakers => { if (!cancelled) useGame.setState({ speaking: speakers.map(p => p.identity) }); });
-        activeRoom.on(RoomEvent.AudioPlaybackStatusChanged, () => setAudioBlocked(!activeRoom?.canPlaybackAudio));
-        activeRoom.on(RoomEvent.Reconnecting, () => { if (!cancelled) { setConnected(false); setStatus('Reconnexion au vocal…'); } });
-        activeRoom.on(RoomEvent.Reconnected, () => { if (!cancelled) { setConnected(true); setStatus(credentials.canPublish ? 'Dans la conversation' : 'À l’écoute des vivants'); } });
-        activeRoom.on(RoomEvent.Disconnected, () => { if (!cancelled) { setConnected(false); setStatus('Vocal déconnecté. Quittez puis rejoignez pour réessayer.'); } });
-        await activeRoom.connect(credentials.url, credentials.token);
-        if (cancelled) { await activeRoom.disconnect(); return; }
-        setCanPublish(credentials.canPublish); setConnected(true); setStatus(credentials.canPublish ? 'Dans la conversation' : 'À l’écoute des vivants');
-        try { await activeRoom.startAudio(); } catch { setAudioBlocked(true); }
-        if (credentials.canPublish && microphoneWanted.current) {
-          try { await activeRoom.localParticipant.setMicrophoneEnabled(true); setMicrophone(true); }
-          catch { microphoneWanted.current = false; setMicrophone(false); setStatus('Microphone refusé. Vous pouvez écouter et écrire.'); }
-        } else setMicrophone(false);
-      } catch (error) { if (!cancelled) { setStatus(error instanceof Error ? error.message : 'Connexion vocale impossible.'); setConnected(false); } }
-    })();
-    return () => { cancelled = true; request.abort(); room.current = null; void activeRoom?.disconnect(); audio.current?.replaceChildren(); useGame.setState({ speaking: [] }); };
-  }, [enabled, generation]);
-  useEffect(() => { audio.current?.querySelectorAll('audio').forEach(element => { element.muted = muted.includes(element.dataset.participant ?? ''); }); }, [muted]);
-  async function toggleMicrophone() {
-    try { await room.current?.localParticipant.setMicrophoneEnabled(!microphone); microphoneWanted.current = !microphone; setMicrophone(!microphone); }
-    catch { notify('Le navigateur n’autorise pas le microphone. Activez sa permission ou utilisez le chat.'); }
+  const available = useGame(s => s.session?.voiceEnabled);
+  const publishAllowed = useGame(s => {
+    const room = s.room; const me = room?.players.find(p => p.id === s.session?.playerId);
+    return !!me && (!room?.game || room.game.phase === 'results' || room.settings.deadCanSpeak || (me.alive && !me.waiting));
+  });
+  const [enabled, setEnabled] = useState(false);
+  const [mode, setMode] = useState<MicrophoneMode>('ptt');
+  const voice = useVoiceConnection(enabled, generation, publishAllowed);
+  const holds = useRef(new Set<string>());
+  const permitted = enabled && voice.connected && voice.canPublish;
+  const { setWanted } = voice;
+  function hold(source: string, pressed: boolean) {
+    if (pressed && permitted && mode === 'ptt') holds.current.add(source); else holds.current.delete(source);
+    setWanted(holds.current.size > 0 && permitted && mode === 'ptt');
   }
-  return <section className="voice-panel"><div ref={audio} hidden />{available ? <><div className="voice-header"><span className={`status-dot ${connected ? '' : 'offline'}`} /><strong>{enabled ? 'Le salon vocal' : 'On se parle ?'}</strong></div><p>{enabled ? status : 'Entrez avec votre micro, ou restez au chat.'}</p><div className="voice-actions">{!enabled ? <button className="button button-dark" onClick={() => { microphoneWanted.current = true; setEnabled(true); }}>Rejoindre le vocal ↗</button> : <><button className={`button ${microphone ? 'button-green' : 'button-cream'}`} disabled={!connected || !canPublish} onClick={() => void toggleMicrophone()}>{!canPublish ? 'Écoute seule' : microphone ? 'Micro ouvert' : 'Micro coupé'}</button><button className="text-button" onClick={() => setEnabled(false)}>Quitter le vocal</button></>}</div>{audioBlocked && enabled && <button className="text-button" onClick={() => void room.current?.startAudio().then(() => setAudioBlocked(false))}>Activer le son du navigateur →</button>}</> : <><strong>Le chat est ouvert.</strong><p>Le vocal n’est pas configuré sur ce salon.</p></>}</section>;
+  useEffect(() => {
+    holds.current.clear(); setWanted(false);
+    const stop = () => { holds.current.clear(); setWanted(false); };
+    const focus = () => { if (mode === 'ptt') stop(); };
+    const down = (event: KeyboardEvent) => {
+      if (event.code !== 'KeyV' || event.repeat || event.ctrlKey || event.metaKey || event.altKey || !permitted || mode !== 'ptt' || isEditing(event.target) || document.querySelector('dialog[open]')) return;
+      event.preventDefault(); holds.current.add('keyboard'); setWanted(true);
+    };
+    const up = (event: KeyboardEvent) => {
+      if (event.code !== 'KeyV' || mode !== 'ptt') return;
+      holds.current.delete('keyboard'); setWanted(holds.current.size > 0);
+    };
+    window.addEventListener('keydown', down); window.addEventListener('keyup', up);
+    window.addEventListener('blur', stop); document.addEventListener('visibilitychange', stop); document.addEventListener('focusin', focus);
+    return () => {
+      stop(); window.removeEventListener('keydown', down); window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', stop); document.removeEventListener('visibilitychange', stop); document.removeEventListener('focusin', focus);
+    };
+  }, [permitted, mode, generation, setWanted]);
+  return <section className="voice-panel" aria-label="Commandes du vocal"><div ref={voice.audio} hidden />{available ? <>
+    <div className="voice-header"><span className={`status-dot ${voice.connected ? '' : 'offline'}`} /><strong>{enabled ? 'Le salon vocal' : 'On se parle ?'}</strong></div>
+    <p role="status">{enabled ? voice.status : 'Rejoignez pour écouter. Maintenez V pour parler.'}</p>
+    <label className="field voice-mode">Mode du microphone<select aria-label="Mode du microphone" value={mode} onChange={event => { holds.current.clear(); setWanted(false); setMode(event.target.value as MicrophoneMode); }}><option value="ptt">Maintenir pour parler · V (recommandé)</option><option value="open">Microphone ouvert · bouton marche / arrêt</option></select></label>
+    <div className="voice-actions">{!enabled ? <button className="button button-dark" onClick={() => setEnabled(true)}>Rejoindre le vocal ↗</button> : <>
+      <span className={`microphone-state ${voice.microphone ? 'transmitting' : ''}`} role="status">{voice.microphone ? '● Microphone : ouvert · transmission' : '○ Microphone : coupé'}{!voice.canPublish && ' · Écoute seule'}</span>
+      {mode === 'ptt' ? <button className={`button talk-button ${voice.microphone ? 'button-green' : 'button-yellow'}`} disabled={!permitted} aria-pressed={voice.microphone}
+        onPointerDown={event => { if (event.button !== 0) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); hold(`pointer-${event.pointerId}`, true); }}
+        onPointerUp={event => hold(`pointer-${event.pointerId}`, false)} onPointerCancel={event => hold(`pointer-${event.pointerId}`, false)} onLostPointerCapture={event => hold(`pointer-${event.pointerId}`, false)}
+        onKeyDown={event => { if ((event.key === ' ' || event.key === 'Enter') && !event.repeat && permitted) { event.preventDefault(); hold('button-key', true); } }}
+        onKeyUp={event => { if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); hold('button-key', false); } }}>Maintenir pour parler · V</button>
+        : <button className={`button ${voice.microphone ? 'button-green' : 'button-cream'}`} disabled={!permitted} onClick={() => setWanted(!voice.microphone)}>{voice.microphone ? 'Couper mon microphone' : 'Ouvrir mon microphone'}</button>}
+      <button className="button button-cream" aria-pressed={!voice.listening} onClick={() => voice.setListening(!voice.listening)}>{voice.listening ? 'Écoute : activée' : 'Écoute : désactivée'}</button>
+      <button className="text-button" onClick={() => { holds.current.clear(); setWanted(false); setEnabled(false); }}>Quitter le vocal</button>
+    </>}</div>
+    {enabled && mode === 'ptt' && <p className="hint">Gardez V ou le bouton enfoncé. Le micro reste coupé pendant la saisie et se coupe si vous quittez la fenêtre.</p>}
+    {voice.audioBlocked && enabled && <button className="button button-yellow" onClick={() => void voice.startAudio()}>Activer le son du navigateur →</button>}
+  </> : <><strong>Le chat est ouvert.</strong><p>Le vocal n’est pas configuré sur ce salon.</p></>}</section>;
 }

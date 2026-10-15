@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_APPEARANCE, DEFAULT_SETTINGS } from '@rene/contracts';
+import { DEFAULT_APPEARANCE, DEFAULT_SETTINGS, EMOTE_DURATION_MS, emoteDuration, voteSeat, type Phase } from '@rene/contracts';
 import { createPersistence, type Guest } from './persistence.js';
 import { MemoryRoomStore, Rooms, type Room } from './rooms.js';
 import { SerialQueue } from './queue.js';
@@ -156,7 +156,42 @@ describe('authoritative room lifecycle', () => {
     expect(player.position.x).toBe(7);
     expect(rooms.move(room, 'p0', { x: -1, z: 0 }, initialTime + 201)).toBe(false);
     await start(rooms, room);
-    expect(rooms.move(room, 'p0', { x: -1, z: 0 }, initialTime + 500)).toBe(false);
+    expect(rooms.move(room, 'p0', { x: -1, z: 0 }, initialTime + 500)).toBe(true);
+    expect(rooms.move(room, 'p0', { x: NaN, z: 0 }, initialTime + 600)).toBe(false);
+    expect(rooms.move(room, 'p0', { x: 2, z: 0 }, initialTime + 700)).toBe(false);
+  });
+  it('allows all phases except vote and tiebreak without weakening server movement validation', async () => {
+    const { rooms, room } = await fixture(); await start(rooms, room);
+    const phases: Phase[] = ['reveal', 'description', 'discussion', 'vote', 'tiebreak', 'elimination', 'whiteGuess', 'results'];
+    for (const [i, phase] of phases.entries()) {
+      room.game!.phase = phase;
+      expect(rooms.move(room, 'p0', { x: 0, z: 1 }, initialTime + 100 + i * 100)).toBe(phase !== 'vote' && phase !== 'tiebreak');
+    }
+    rooms.disconnected(room, 'p0', initialTime + 1000);
+    expect(rooms.move(room, 'p0', { x: 0, z: 1 }, initialTime + 1100)).toBe(false);
+  });
+  it('seats only living participants authoritatively and retains positions when voting ends', async () => {
+    const { rooms, room } = await fixture(); await start(rooms, room);
+    rooms.join(room, guest('late'), initialTime + 20);
+    const spectator = { ...room.players.get('late')!.position };
+    const now = await votePhase(rooms, room);
+    room.game!.alive.forEach((id, index, living) => expect(room.players.get(id)!.position).toEqual(voteSeat(index, living.length)));
+    expect(room.players.get('late')!.position).toEqual(spectator);
+    const before = { ...room.players.get('p0')!.position };
+    expect(rooms.move(room, 'p0', { x: 0, z: 1 }, now + 100)).toBe(false);
+    await rooms.tick(room, room.game!.deadline!); // no votes: next description round
+    expect(room.players.get('p0')!.position).toEqual(before);
+    expect(rooms.move(room, 'p0', { x: 0, z: 1 }, room.game!.deadline! + 100)).toBe(true);
+  });
+  it('publishes replayable emotes with bounded server deadlines and expires the projection', async () => {
+    const { rooms, room } = await fixture();
+    for (const [i, kind] of (['wave', 'suspect', 'dance'] as const).entries()) {
+      const now = initialTime + i * (EMOTE_DURATION_MS + 1);
+      await rooms.command(room, 'p0', { type: 'player.emote', kind }, now);
+      expect(rooms.snapshot(room, now).players[0].emote).toEqual({ kind, until: now + emoteDuration(kind) });
+      await expect(rooms.command(room, 'p0', { type: 'player.emote', kind }, now + 1)).rejects.toThrow('souffle');
+      expect(rooms.snapshot(room, now + EMOTE_DURATION_MS).players[0].emote).toBeUndefined();
+    }
   });
   it('expires empty rooms after 30 minutes and drops their membership mappings', async () => {
     const { rooms, room } = await fixture();

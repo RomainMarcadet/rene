@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { io, type Socket } from 'socket.io-client';
-import { DEFAULT_APPEARANCE, type Ack, type ClientEvents, type Command, type CommandEnvelope, type PrivatePlayerState, type RoomSnapshot, type ServerEvents } from '@rene/contracts';
+import { DEFAULT_APPEARANCE, EMOTE_DURATION_MS, type Ack, type ClientEvents, type Command, type CommandEnvelope, type PrivatePlayerState, type RoomSnapshot, type ServerEvents } from '@rene/contracts';
 import { createApp } from './app.js';
 import { readConfig } from './config.js';
 import type { Guest, Persistence } from './persistence.js';
@@ -105,6 +105,47 @@ describe('real Socket.IO clients', () => {
     expect(actors[0].snapshot!.players.reduce((n, p) => n + p.score, 0)).toBe(6);
     expect((await send(actors[0], { type: 'game.next' })).ok).toBe(true);
     expect(room.game).toBeNull(); expect(room.completedGames).toBe(1);
+  });
+
+  it('synchronizes movement and replayable emotes across real clients through voting', async () => {
+    const { running, actors, room } = await opened();
+    const moving = actors[0];
+    const positions: number[] = [];
+    actors[1].socket.on('poses', value => { if (value[moving.playerId]) positions.push(value[moving.playerId].z); });
+    for (const a of actors) await send(a, { type: 'player.ready', ready: true });
+    await send(moving, { type: 'game.start' });
+    await expire(running, room, moving);
+    const moveOnce = async () => {
+      const before = room.players.get(moving.playerId)!.position.z;
+      await new Promise(resolve => setTimeout(resolve, 45));
+      moving.socket.emit('move', { x: 0, z: .5 });
+      await expect.poll(() => room.players.get(moving.playerId)!.position.z).toBeGreaterThan(before);
+      await expect.poll(() => positions.at(-1)).toBe(room.players.get(moving.playerId)!.position.z);
+    };
+    await moveOnce(); // description
+    for (const kind of ['wave', 'suspect', 'dance'] as const) {
+      room.players.get(moving.playerId)!.lastEmoteAt = -Infinity; // no wall-clock cooldown delay in this transport test
+      expect((await send(moving, { type: 'player.emote', kind })).ok).toBe(true);
+      await expect.poll(() => actors.every(a => a.snapshot?.players.find(p => p.id === moving.playerId)?.emote?.kind === kind)).toBe(true);
+      const deadlines = actors.map(a => a.snapshot!.players.find(p => p.id === moving.playerId)!.emote!.until);
+      expect(new Set(deadlines).size).toBe(1);
+      expect(deadlines[0]).toBeLessThanOrEqual(Date.now() + EMOTE_DURATION_MS);
+    }
+    while (room.game!.phase === 'description') {
+      const turn = actors.find(a => a.playerId === room.game!.turnPlayerId)!;
+      await send(turn, { type: 'game.describe', text: 'Très discret' }, { phaseId: room.game!.phaseId });
+    }
+    await moveOnce(); // discussion
+    await send(moving, { type: 'game.skipDiscussion' }, { phaseId: room.game!.phaseId });
+    const seated = { ...room.players.get(moving.playerId)!.position };
+    moving.socket.emit('move', { x: 0, z: 1 });
+    await new Promise(resolve => setTimeout(resolve, 80));
+    expect(room.players.get(moving.playerId)!.position).toEqual(seated);
+    await expire(running, room, moving); // no ballots: return to description
+    await moveOnce();
+    moving.socket.emit('move', { x: NaN, z: 999 });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(Number.isFinite(room.players.get(moving.playerId)!.position.x)).toBe(true);
   });
 
   it('recovers the same place after refresh and replaces a second controlling connection', async () => {
