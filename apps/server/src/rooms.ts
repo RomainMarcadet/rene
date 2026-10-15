@@ -1,6 +1,6 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import {
-  DEFAULT_SETTINGS, validComposition, type AvatarAppearance, type ChatMessage,
+  DEFAULT_SETTINGS, validComposition, canMoveInPhase, voteSeat, EMOTE_COOLDOWN_MS, emoteDuration, type AvatarAppearance, type ChatMessage,
   type Command, type PublicPlayer, type RoomSettings, type RoomSnapshot, type PrivatePlayerState,
 } from '@rene/contracts';
 import { createGame, applyGameAction, chooseWordPair, publicGame, privateGame, type GameState } from '@rene/engine';
@@ -145,8 +145,8 @@ export class Rooms {
         room.chat = room.chat.slice(-100); break;
       case 'player.emote':
         if (!editable(room) && !room.game?.alive.includes(id)) throw new Error('Les éliminés restent discrets pendant la partie.');
-        if (now - player.lastEmoteAt < 2000) throw new Error('Laisse ton avatar reprendre son souffle.');
-        player.lastEmoteAt = now; player.emote = { kind: command.kind, until: now + 2500 }; break;
+        if (now - player.lastEmoteAt < EMOTE_COOLDOWN_MS) throw new Error('Laisse ton avatar reprendre son souffle.');
+        player.lastEmoteAt = now; player.emote = { kind: command.kind, until: now + emoteDuration(command.kind) }; break;
       default: throw new Error('Action indisponible.');
     }
     room.revision++;
@@ -155,7 +155,15 @@ export class Rooms {
   async gameAction(room: Room, action: Parameters<typeof applyGameAction>[1], now: number) {
     if (!room.game || room.game.phase === 'results') throw new Error('Aucune partie en cours.');
     const oldAlive = room.game.alive.length;
+    const wasMoving = canMoveInPhase(room.game.phase);
     room.game = applyGameAction(room.game, action, now, this.random);
+    if (wasMoving && !canMoveInPhase(room.game.phase)) {
+      // Authoritative placement, retained after the vote: no return to stale lobby poses.
+      room.game.alive.forEach((id, index, living) => {
+        const player = room.players.get(id);
+        if (player && !player.waiting) { player.position = voteSeat(index, living.length); player.lastMoveAt = now; }
+      });
+    }
     if (room.game.alive.length < oldAlive || room.game.phase === 'results') room.voiceGeneration++;
     room.revision++;
     await this.persistResult(room, now);
@@ -202,7 +210,8 @@ export class Rooms {
 
   move(room: Room, id: string, direction: { x: number; z: number }, now: number) {
     const player = room.players.get(id);
-    if (!player || !player.connected || (room.game && room.game.phase !== 'results')) return false;
+    if (!player || !player.connected || !canMoveInPhase(room.game?.phase)) return false;
+    if (!Number.isFinite(direction.x) || !Number.isFinite(direction.z) || Math.abs(direction.x) > 1 || Math.abs(direction.z) > 1) return false;
     const dt = Math.min(0.12, Math.max(0, (now - player.lastMoveAt) / 1000));
     if (dt < 0.035) return false;
     player.lastMoveAt = now;
