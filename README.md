@@ -42,13 +42,15 @@ Ouvrir alors **http://localhost:8080**, sans lancer `npm run dev` en parallèle.
 5. Décrire son mot à son tour, discuter, puis voter. Un Mr. White éliminé peut deviner le mot des Civils une seule fois.
 6. Aux résultats, l'hôte retourne au salon pour préparer la partie suivante. Le classement se cumule pendant le nombre de parties configuré, puis une nouvelle session commence.
 
-Déplacements : **ZQSD/WASD**, flèches, ou commandes tactiles. Les positions pendant les phases de jeu sont mises en scène. Les emotes sont disponibles dans le salon. Pour le vocal, rejoindre l'audio puis activer son micro ; un clic sur une personne permet de couper son son localement.
+Déplacements : **ZQSD/WASD**, flèches, ou commandes tactiles. Les déplacements restent libres pendant la partie, sauf pendant le vote et le départage : les vivants rejoignent la table, puis repartent de cette position. Les emotes restent disponibles pour les joueurs autorisés. Pour le vocal, rejoindre le salon puis **maintenir V** ou le bouton tactile pour parler (mode par défaut). Le mode microphone ouvert s’active séparément. **Microphone**, **écoute** et **quitter le vocal** ont chacun leur commande ; le bouton d’un participant coupe seulement son son localement. Une perte de focus, une reconnexion ou un changement de génération vocale coupe la transmission : réactivez-la volontairement.
 
 Pour tester quatre joueurs sur un même ordinateur, utiliser **quatre profils de navigateur ou contextes privés isolés**. Plusieurs onglets d'un même profil représentent la même identité ; la connexion la plus récente remplace l'ancienne. Un rafraîchissement conserve sa place grâce au cookie invité. Les outils développeur ne peuvent pas modifier les règles, les rôles, les points ou les votes côté serveur.
 
 `localhost` désigne l'ordinateur de chaque personne : il ne faut pas envoyer un lien localhost à des amis distants. Pour un essai sur le réseau local, utiliser l'adresse LAN du serveur pour le lien et `WEB_ORIGIN`, et adapter `LIVEKIT_URL` ainsi que `rtc.node_ip` dans `deploy/livekit.dev.yaml`. Les navigateurs demandent un contexte sécurisé pour le microphone : utiliser le déploiement HTTPS pour la recette multiappareil avec vocal.
 
 Si `/api/session` répond `200` mais que le salon ne se connecte pas, vérifier **l'adresse réellement ouverte dans le navigateur** : elle doit correspondre à `WEB_ORIGIN` (protocole, hôte et port, sans chemin). Par exemple, pour `http://192.168.1.50:5173`, définir cette même valeur puis redémarrer `npm run dev`. Le proxy doit conserver l'en-tête `Host`. Le serveur journalise l'origine attendue au démarrage et les refus de connexion temps réel. Vite conserve désormais le port 5173 au lieu d'en choisir silencieusement un autre s'il est occupé.
+
+Le bouton **COMMENT JOUER ?** sur l’accueil et **Comment jouer ?** dans le salon ouvrent les mêmes règles illustrées. Pendant une description, une carte affiche le portrait, le nom et le chronomètre du joueur actif ; les éliminés sont marqués en rouge avec des yeux rouges. Le dernier indice reste en tête de l’historique, suivi des tours récents.
 
 ## Commandes
 
@@ -58,14 +60,17 @@ Si `/api/session` répond `200` mais que le salon ne se connecte pas, vérifier 
 | `npm run check` | Types, lint, tests unitaires/intégration, puis build |
 | `npm test` | Tests Vitest |
 | `npx playwright install chromium` | Installer Chromium pour les tests navigateur |
-| `npm run test:e2e` | Parcours multijoueur Playwright |
+| `npm run test:e2e` | Parcours multijoueur et mobile Playwright ; audio ignoré explicitement |
+| `RENE_VOICE_E2E=1 npm run test:e2e` | Même recette avec LiveKit local réel et microphones synthétiques |
 | `npm run build` | Compiler le client et le serveur |
 | `npm run db:generate` | Générer le client Prisma |
 | `npm run db:migrate` | Appliquer les migrations PostgreSQL versionnées |
 
+Playwright démarre ses serveurs isolés sur **5175** et **3005**, sans réutiliser votre serveur de développement. Le mode vocal suppose `docker compose up -d --wait livekit` et la configuration locale de `deploy/livekit.dev.yaml` sur 7880/7881/7882. Les tests n’utilisent pas de base de données ; les vérifications de persistance nécessitent PostgreSQL séparément. Les captures de recette sont écrites dans `output/playwright/` (non versionné).
+
 Le résultat des tests locaux et les vérifications restant à réaliser sont décrits dans [la recette](docs/acceptance.md). La CI prépare PostgreSQL, contrôle le code et exécute les tests navigateur. Aucun workflow ne publie d'image ni ne déploie automatiquement.
 
-À ce stade, **77 tests passent**, ainsi que le contrôle TypeScript complet, le lint et les builds client/serveur (`npm run check`). Les six tests réseau Socket.IO utilisent de vrais clients et couvrent notamment une partie complète à quatre, les votes invalides, les mots privés, la reconnexion et la préparation d'une nouvelle partie. Une recette manuelle a confirmé le salon 3D dans Comet et Safari. La partie à quatre personnes sur leurs appareils et le vocal restent à vérifier selon la recette.
+Les validations de la V1.1, le diagnostic audio et les limites de la recette sont détaillés dans [le compte rendu V1.1](docs/v1.1.md). La recette automatisée emploie des clients indépendants et des données serveur réelles ; l’écoute humaine, Safari/mobile physique et les réseaux distants restent à valider sur l’hébergement cible.
 
 L'image Docker sur le **port 8080** a également été compilée et testée dans une pile isolée avec PostgreSQL et Caddy 2.11.4 : migrations, frontend/API en HTTPS, quatre clients Socket.IO (polling et WebSocket), chat et cookies invités sont validés. Les certificats de cette recette sont internes ; le vocal reste à vérifier sur le serveur réel. Voir [les preuves de cette recette Docker/Caddy](docs/acceptance.md).
 
