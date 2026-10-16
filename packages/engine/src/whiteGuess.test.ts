@@ -33,13 +33,16 @@ describe('conservative White spelling validation', () => {
     expect(normalizeGuess(' «   Carte d’IDENTITÉ ! » ')).toBe("carte d'identite");
     for (let i = 0; i < 10; i++) expect(isAcceptableWhiteGuess('balais', 'balai')).toBe(true);
   });
-  it('accepts every catalogue word exactly and never confuses two different catalogue words', () => {
-    const words = [...new Set(WORD_PAIRS.flatMap(pair => [pair.a, pair.b]))];
-    for (const expected of words) {
-      expect(isAcceptableWhiteGuess(expected, expected)).toBe(true);
-      for (const other of words.filter(word => normalizeGuess(word) !== normalizeGuess(expected))) {
-        expect(isAcceptableWhiteGuess(other, expected), `${other} != ${expected}`).toBe(false);
-      }
+  const words = [...new Set(WORD_PAIRS.flatMap(pair => [pair.a, pair.b]))];
+  const normalized = words.map(normalizeGuess);
+  // Preserve the exhaustive cross-product without millions of assertion objects,
+  // a single growing timeout, or word-bearing failure messages.
+  it.each(Array.from({ length: Math.ceil(words.length / 100) }, (_, i) => i))('accepts exact catalogue words and rejects every distinct word, batch %i', batch => {
+    let failures = 0;
+    for (let i = batch * 100; i < Math.min(words.length, (batch + 1) * 100); i++) {
+      if (!isAcceptableWhiteGuess(words[i], words[i])) failures++;
+      for (let j = 0; j < words.length; j++) if (normalized[i] !== normalized[j] && isAcceptableWhiteGuess(words[j], words[i])) failures++;
     }
+    expect(failures).toBe(0);
   });
 });

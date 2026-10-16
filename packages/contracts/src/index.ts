@@ -14,7 +14,7 @@ export const SettingsSchema = z.object({
   descriptionSeconds: z.number().int().min(10).max(180), discussionSeconds: z.number().int().min(15).max(600),
   voteSeconds: z.number().int().min(10).max(120), guessSeconds: z.number().int().min(10).max(120),
   roundsPerSession: z.number().int().min(1).max(20), hostCanSkipDiscussion: z.boolean(), deadCanSpeak: z.boolean(),
-  category: z.enum(['all', 'quotidien', 'nature', 'cuisine', 'culture', 'voyage']), difficulty: z.enum(['all', 'easy', 'medium', 'hard']),
+  category: z.enum(['all', 'quotidien', 'nature', 'cuisine', 'culture', 'voyage', 'cinema', 'jeux-video', 'internet', 'musique', 'sport', 'politique', 'television', 'technologie', 'histoire', 'sciences']), difficulty: z.enum(['all', 'easy', 'medium', 'hard']),
 }).strict();
 export type RoomSettings = z.infer<typeof SettingsSchema>;
 export const DEFAULT_SETTINGS: RoomSettings = { automaticRoles: true, undercoverCount: 1, whiteCount: 1, descriptionSeconds: 45, discussionSeconds: 120, voteSeconds: 30, guessSeconds: 30, roundsPerSession: 5, hostCanSkipDiscussion: true, deadCanSpeak: false, category: 'all', difficulty: 'all' };
