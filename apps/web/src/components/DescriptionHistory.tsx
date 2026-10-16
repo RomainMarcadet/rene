@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
-import type { Description, PublicPlayer } from '@rene/contracts';
+import type { Description, PublicGame, PublicPlayer } from '@rene/contracts';
 
-export function DescriptionHistory({ descriptions, players, open }: { descriptions: Description[]; players: PublicPlayer[]; open: boolean }) {
+export function DescriptionHistory({ game, players, visible }: { game: PublicGame | null; players: PublicPlayer[]; visible: boolean }) {
+  const descriptions = game?.descriptions ?? []; const open = game?.phase !== 'results';
   const list = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (list.current) list.current.scrollTop = 0; }, [descriptions.length]);
+  useEffect(() => { if (list.current) list.current.scrollTop = 0; }, [descriptions.length, visible]);
   if (!descriptions.length) return null;
   // Copy/group the projection: keep the server's turn order inside each round.
   const rounds = [...new Set(descriptions.map(d => d.round))].sort((a, b) => b - a);
