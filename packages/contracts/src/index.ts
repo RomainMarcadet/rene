@@ -39,7 +39,7 @@ export interface GameResult { winner: Winner; winnerIds: string[]; civilWord: st
 export interface PublicGame {
   id: string; phase: Phase; phaseId: string; round: number; deadline: number | null; turnPlayerId: string | null;
   order: string[]; descriptions: Description[]; voteCandidates: string[]; voteCounts: Record<string, number> | null;
-  votedPlayerIds: string[]; eliminatedPlayerId: string | null; whitePlayerId: string | null; result: GameResult | null;
+  readyToVotePlayerIds: string[]; votedPlayerIds: string[]; eliminatedPlayerId: string | null; whitePlayerId: string | null; result: GameResult | null;
 }
 export type ChatReaction = 'up' | 'down';
 export interface ChatMessage { id: string; playerId: string; name: string; text: string; at: number; reactions: { up: number; down: number } }
@@ -61,6 +61,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('game.vote'), targetId: z.string().min(1).max(100) }),
   z.object({ type: z.literal('game.guess'), word: z.string().trim().min(1).max(100) }),
   z.object({ type: z.literal('game.skipDiscussion') }),
+  z.object({ type: z.literal('game.setVoteReady'), ready: z.boolean() }).strict(),
   z.object({ type: z.literal('chat.react'), messageId: z.string().min(1).max(100), reaction: z.enum(['up', 'down']).nullable() }).strict(),
   z.object({ type: z.literal('chat.send'), text: z.string().trim().min(1).max(400) }),
   z.object({ type: z.literal('player.emote'), kind: z.enum(['wave', 'dance', 'suspect']) }),

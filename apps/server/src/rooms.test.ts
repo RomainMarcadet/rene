@@ -294,3 +294,36 @@ describe('chat reactions', () => {
     expect(room.chat).toHaveLength(0); expect(room.chatReactions.size).toBe(0);
   });
 });
+
+
+describe('discussion readiness service', () => {
+  async function discussion(rooms: Rooms, room: Room) {
+    await start(rooms, room); let now = room.game!.deadline!;
+    await rooms.tick(room, now);
+    while (room.game!.phase === 'description') await rooms.command(room, room.game!.turnPlayerId!, { type: 'game.describe', text: 'Indice' }, ++now);
+    return now;
+  }
+  it('does not turn a disconnection into consent and retains a confirmation over reconnect', async () => {
+    const { rooms, room } = await fixture(); let now = await discussion(rooms, room);
+    await rooms.command(room, 'p0', { type: 'game.setVoteReady', ready: true }, ++now);
+    rooms.disconnected(room, 'p0', ++now); rooms.disconnected(room, 'p3', ++now);
+    for (const id of ['p1', 'p2']) await rooms.command(room, id, { type: 'game.setVoteReady', ready: true }, ++now);
+    expect(room.game!.phase).toBe('discussion'); expect(rooms.snapshot(room, now).game!.readyToVotePlayerIds).toEqual(['p0', 'p1', 'p2']);
+    rooms.connected(room, 'p0', ++now); rooms.connected(room, 'p3', ++now);
+    await rooms.command(room, 'p3', { type: 'game.setVoteReady', ready: true }, ++now);
+    expect(room.game!.phase).toBe('vote');
+    room.game!.alive.forEach((id, index, living) => expect(room.players.get(id)!.position).toEqual(voteSeat(index, living.length)));
+    await expect(rooms.command(room, 'p1', { type: 'game.setVoteReady', ready: false }, now + 1)).rejects.toThrow('discussion');
+  });
+  it('excludes waiting guests, handles departure unanimity, and keeps the timer as a fallback', async () => {
+    const { rooms, room } = await fixture(5); let now = await discussion(rooms, room);
+    rooms.join(room, guest('late'), ++now);
+    await expect(rooms.command(room, 'late', { type: 'game.setVoteReady', ready: true }, ++now)).rejects.toThrow('vivants');
+    const leaving = room.game!.alive.find(id => room.game!.roles[id] === 'civilian')!;
+    for (const id of room.game!.alive.filter(id => id !== leaving)) await rooms.command(room, id, { type: 'game.setVoteReady', ready: true }, ++now);
+    await rooms.leave(room, leaving, now + 1);
+    expect(room.game!.phase).toBe('vote'); expect(room.game!.readyToVotePlayerIds).not.toContain(leaving);
+    const other = await fixture(); await discussion(other.rooms, other.room);
+    await other.rooms.tick(other.room, other.room.game!.deadline!); expect(other.room.game!.phase).toBe('vote');
+  });
+});

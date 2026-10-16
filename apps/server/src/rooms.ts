@@ -134,6 +134,7 @@ export class Rooms {
         }
         for (const p of room.players.values()) { p.alive = true; p.waiting = false; p.ready = false; delete p.role; }
         break;
+      case 'game.setVoteReady': await this.gameAction(room, { type: 'setVoteReady', playerId: id, ready: command.ready }, now); break;
       case 'game.describe': await this.gameAction(room, { type: 'describe', playerId: id, text: command.text }, now); break;
       case 'game.vote': await this.gameAction(room, { type: 'vote', playerId: id, targetId: command.targetId }, now); break;
       case 'game.guess': await this.gameAction(room, { type: 'guess', playerId: id, word: command.word }, now); break;

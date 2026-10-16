@@ -338,3 +338,53 @@ describe('banque française', () => {
     expect(history[count]).not.toBe(history[count - 1]);
   });
 });
+
+
+describe('discussion readiness unanimity', () => {
+  function discussion(initial = fixture()) {
+    let game = initial.phase === 'reveal' || initial.phase === 'elimination' ? expire(initial) : initial;
+    while (game.phase === 'description') game = act(game, { type: 'describe', playerId: game.turnPlayerId!, text: 'Un indice' });
+    expect(game.phase).toBe('discussion'); return game;
+  }
+  it('requires all living players even when host skipping is disabled, with one transition only', () => {
+    let game = discussion(fixture(4, { hostCanSkipDiscussion: false }));
+    const original = structuredClone(game); const phase = game.phaseId;
+    for (const id of game.alive.slice(0, 3)) game = act(game, { type: 'setVoteReady', playerId: id, ready: true });
+    expect(game.phase).toBe('discussion'); expect(game.deadline).toBe(original.deadline); expect(game.phaseId).toBe(phase);
+    const readyId = game.alive[0];
+    game = act(game, { type: 'setVoteReady', playerId: readyId, ready: true });
+    expect(game.readyToVotePlayerIds).toHaveLength(3);
+    game = act(game, { type: 'setVoteReady', playerId: readyId, ready: false }); expect(game.readyToVotePlayerIds).toHaveLength(2);
+    game = act(game, { type: 'setVoteReady', playerId: readyId, ready: true });
+    game = act(game, { type: 'setVoteReady', playerId: game.alive[3], ready: true });
+    expect(game.phase).toBe('vote'); expect(game.revision).toBe(original.revision + 1);
+    expect(game.readyToVotePlayerIds).toEqual([]); expect(original.readyToVotePlayerIds).toEqual([]);
+    expect(() => act(game, { type: 'setVoteReady', playerId: readyId, ready: false })).toThrow('discussion');
+  });
+  it('keeps the deadline maximum and resets readiness for a new round', () => {
+    let game = discussion(); const deadline = game.deadline;
+    game = act(game, { type: 'setVoteReady', playerId: game.alive[0], ready: true });
+    game = act(game, { type: 'setVoteReady', playerId: game.alive[0], ready: false });
+    expect(game.deadline).toBe(deadline);
+    game = expire(game); expect(game.phase).toBe('vote');
+    game = expire(game); expect(game.round).toBe(2);
+    game = discussion(game); expect(game.readyToVotePlayerIds).toEqual([]);
+    expect(() => applyGameAction(game, { type: 'setVoteReady', playerId: game.alive[0], ready: true }, game.deadline!, random)).toThrow('délai');
+  });
+  it('excludes eliminated players and spectators and recalculates after a permanent departure', () => {
+    let game = fixture(6); const eliminated = players(game, 'civilian')[0];
+    game = discussion(votedOut(game, eliminated));
+    expect(() => act(game, { type: 'setVoteReady', playerId: eliminated, ready: true })).toThrow('vivants');
+    expect(() => act(game, { type: 'setVoteReady', playerId: 'spectator', ready: false })).toThrow('vivants');
+    const leaving = game.alive.find(id => game.roles[id] === 'civilian')!;
+    for (const id of game.alive.filter(id => id !== leaving)) game = act(game, { type: 'setVoteReady', playerId: id, ready: true });
+    game = act(game, { type: 'leave', playerId: leaving });
+    expect(game.phase).toBe('vote'); expect(game.alive).not.toContain(leaving); expect(game.readyToVotePlayerIds).toEqual([]);
+  });
+  it('returns independent readiness projections and still supports host skipping', () => {
+    let game = discussion(); game = act(game, { type: 'setVoteReady', playerId: game.alive[0], ready: true });
+    const projection = publicGame(game); projection.readyToVotePlayerIds.pop();
+    expect(game.readyToVotePlayerIds).toHaveLength(1);
+    expect(act(game, { type: 'skipDiscussion' }).phase).toBe('vote');
+  });
+});

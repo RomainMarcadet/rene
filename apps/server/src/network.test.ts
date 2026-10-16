@@ -167,6 +167,23 @@ describe('real Socket.IO clients', () => {
     expect(actors.every(a => a.snapshot?.players.every(p => p.score === 0))).toBe(true);
   });
 
+  it('serializes the final readiness confirmations and seats voters exactly once', async () => {
+    const { running, actors, room } = await opened();
+    for (const a of actors) await send(a, { type: 'player.ready', ready: true });
+    await send(actors[0], { type: 'game.start' }); await expire(running, room, actors[0]);
+    while (room.game!.phase === 'description') await send(actors.find(a => a.playerId === room.game!.turnPlayerId)!, { type: 'game.describe', text: 'Indice' }, { phaseId: room.game!.phaseId });
+    const phaseId = room.game!.phaseId; const revision = room.game!.revision;
+    for (const index of [0, 1]) expect((await send(actors[index], { type: 'game.setVoteReady', ready: true }, { phaseId })).ok).toBe(true);
+    await expect.poll(() => actors.every(a => a.snapshot?.game?.readyToVotePlayerIds.length === 2)).toBe(true);
+    const last = await Promise.all([2, 3].map(index => send(actors[index], { type: 'game.setVoteReady', ready: true }, { phaseId })));
+    expect(last.every(ack => ack.ok)).toBe(true);
+    await expect.poll(() => actors.every(a => a.snapshot?.game?.phase === 'vote')).toBe(true);
+    expect(room.game!.revision).toBe(revision + 1);
+    expect((await send(actors[2], { type: 'game.setVoteReady', ready: false }, { phaseId })).ok).toBe(false);
+    expect(room.game!.ballots).toEqual({});
+    expect(actors.every(a => a.snapshot?.players.every(p => !p.role))).toBe(true);
+  });
+
   it('recovers the same place after refresh and replaces a second controlling connection', async () => {
     const { running, url, actors, room } = await opened();
     for (const a of actors) await send(a, { type: 'player.ready', ready: true });

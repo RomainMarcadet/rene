@@ -18,6 +18,7 @@ export type GameAction =
   | { type: 'vote'; playerId: string; targetId: string }
   | { type: 'guess'; playerId: string; word: string }
   | { type: 'skipDiscussion' }
+  | { type: 'setVoteReady'; playerId: string; ready: boolean }
   | { type: 'leave'; playerId: string }
   | { type: 'timeout' };
 
@@ -69,13 +70,14 @@ export function createGame(input: {
     words: { civilian: invert ? pair.b : pair.a, undercover: invert ? pair.a : pair.b }, settings,
     phase: 'reveal', phaseId: `${id}:0`, revision: 0, round: 1, deadline: now + 8_000,
     turnPlayerId: null, order: shuffled(playerIds, random), descriptions: [],
-    ballots: {}, voteCandidates: [], voteCounts: null, votedPlayerIds: [],
+    readyToVotePlayerIds: [], ballots: {}, voteCandidates: [], voteCounts: null, votedPlayerIds: [],
     eliminatedPlayerId: null, whitePlayerId: null, result: null,
   };
 }
 
 function enter(game: GameState, phase: Phase, now: number, seconds: number | null) {
   game.phase = phase;
+  game.readyToVotePlayerIds = [];
   game.revision += 1;
   game.phaseId = `${game.id}:${game.revision}`;
   game.deadline = seconds === null ? null : now + seconds * 1_000;
@@ -125,6 +127,10 @@ function newRound(game: GameState, now: number) {
   game.eliminatedPlayerId = null;
   game.whitePlayerId = null;
   nextDescription(game, now);
+}
+
+function everyoneReadyToVote(game: GameState) {
+  return game.alive.length > 0 && game.alive.every(id => game.readyToVotePlayerIds.includes(id));
 }
 
 function startVote(game: GameState, now: number, candidates = game.alive, tiebreak = false) {
@@ -184,6 +190,7 @@ function leave(game: GameState, playerId: string, now: number, random: Random) {
   requireRule(game.playerIds.includes(playerId), 'Ce joueur ne participe pas à la partie.');
   if (game.departed.includes(playerId)) return;
   game.departed.push(playerId);
+  game.readyToVotePlayerIds = game.readyToVotePlayerIds.filter(id => id !== playerId);
   const wasAlive = game.alive.includes(playerId);
   game.alive = game.alive.filter(id => id !== playerId);
   if (game.phase === 'whiteGuess') {
@@ -195,6 +202,7 @@ function leave(game: GameState, playerId: string, now: number, random: Random) {
     return;
   }
   if (!wasAlive || finishIfWon(game, now)) return;
+  if (game.phase === 'discussion' && everyoneReadyToVote(game)) startVote(game, now);
   if (game.phase === 'description' && game.turnPlayerId === playerId) nextDescription(game, now);
   if (game.phase === 'vote' || game.phase === 'tiebreak') {
     game.voteCandidates = game.voteCandidates.filter(id => id !== playerId);
@@ -227,6 +235,13 @@ export function applyGameAction(previous: GameState, action: GameAction, now: nu
       requireRule(game.phase === 'description' && game.turnPlayerId === action.playerId && game.alive.includes(action.playerId), 'Ce n’est pas votre tour de décrire.');
       game.descriptions.push({ playerId: action.playerId, text: validatedText(action.text), round: game.round, timedOut: false });
       nextDescription(game, now);
+      break;
+    case 'setVoteReady':
+      requireRule(game.phase === 'discussion', 'La discussion est terminée ou n’a pas commencé.');
+      requireRule(game.alive.includes(action.playerId) && !game.departed.includes(action.playerId), 'Seuls les joueurs vivants peuvent se déclarer prêts.');
+      requireRule(typeof action.ready === 'boolean', 'Confirmation invalide.');
+      game.readyToVotePlayerIds = game.playerIds.filter(id => game.alive.includes(id) && (id === action.playerId ? action.ready : game.readyToVotePlayerIds.includes(id)));
+      if (everyoneReadyToVote(game)) startVote(game, now);
       break;
     case 'skipDiscussion':
       requireRule(game.phase === 'discussion' && game.settings.hostCanSkipDiscussion, 'La discussion ne peut pas être écourtée.');
@@ -261,7 +276,7 @@ export function publicGame(game: GameState): PublicGame {
     id: game.id, phase: game.phase, phaseId: game.phaseId, round: game.round, deadline: game.deadline,
     turnPlayerId: game.turnPlayerId, order: [...game.order], descriptions: game.descriptions.map(description => ({ ...description })),
     voteCandidates: [...game.voteCandidates], voteCounts: game.voteCounts ? { ...game.voteCounts } : null,
-    votedPlayerIds: [...game.votedPlayerIds], eliminatedPlayerId: game.eliminatedPlayerId,
+    readyToVotePlayerIds: [...game.readyToVotePlayerIds], votedPlayerIds: [...game.votedPlayerIds], eliminatedPlayerId: game.eliminatedPlayerId,
     whitePlayerId: game.whitePlayerId, result: publicResult(game.result),
   };
 }
