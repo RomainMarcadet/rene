@@ -3,7 +3,7 @@ import {
   DEFAULT_SETTINGS, validComposition, canMoveInPhase, voteSeat, EMOTE_COOLDOWN_MS, emoteDuration, type AvatarAppearance, type ChatMessage, type ChatReaction,
   type Command, type PublicPlayer, type RoomSettings, type RoomSnapshot, type PrivatePlayerState,
 } from '@rene/contracts';
-import { createGame, applyGameAction, chooseWordPair, publicGame, privateGame, type GameState } from '@rene/engine';
+import { createGame, applyGameAction, chooseWordPair, recordWordSelection, WORD_PAIRS, publicGame, privateGame, type GameState, type WordPair } from '@rene/engine';
 import type { Guest, Persistence } from './persistence.js';
 
 export interface Player extends PublicPlayer { joinedAt: number; disconnectedAt: number | null; lastMoveAt: number; lastChatAt: number; lastEmoteAt: number }
@@ -22,7 +22,7 @@ const editable = (room: Room) => !room.game || room.game.phase === 'results';
 /** Every transport mutation is queued by player/room before entering this service. */
 export class Rooms {
   readonly playerRooms = new Map<string, string>();
-  constructor(readonly store: RoomStore, private persistence: Persistence, private maxRooms = 100, private random = secureRandom, private onPersistenceError: (error: unknown) => void = () => undefined) {}
+  constructor(readonly store: RoomStore, private persistence: Persistence, private maxRooms = 100, private random = secureRandom, private onPersistenceError: (error: unknown) => void = () => undefined, private wordPairs: readonly WordPair[] = WORD_PAIRS) {}
 
   roomFor(playerId: string) { const code = this.playerRooms.get(playerId); return code ? this.store.get(code) : undefined; }
   requireRoom(playerId: string) { const room = this.roomFor(playerId); if (!room) throw new Error('Rejoins une salle pour continuer.'); return room; }
@@ -103,7 +103,7 @@ export class Rooms {
         this.requireHost(room, id); this.requireLobby(room);
         if (!command.settings.automaticRoles && room.players.size >= 4 && !validComposition(room.players.size, command.settings)) throw new Error('Prévois au moins deux Civils et un Infiltré.');
         // Validate that the word filters have content before accepting them.
-        chooseWordPair(command.settings, [], this.random);
+        chooseWordPair(command.settings, [], this.random, this.wordPairs);
         room.settings = { ...command.settings };
         for (const p of room.players.values()) p.ready = false;
         break;
@@ -113,11 +113,9 @@ export class Rooms {
         const players = [...room.players.values()];
         if (!validComposition(players.length, room.settings)) throw new Error('Il faut de 4 à 12 joueurs et une répartition valide.');
         if (!players.every(p => p.connected && p.ready)) throw new Error('Tout le monde doit être connecté et prêt.');
-        const pair = chooseWordPair(room.settings, room.usedWords, this.random);
+        const pair = chooseWordPair(room.settings, room.usedWords, this.random, this.wordPairs);
         room.game = createGame({ id: randomUUID(), playerIds: players.map(p => p.id), settings: room.settings, pair, now, random: this.random });
-        room.usedWords.push(pair.id);
-        // Keep a bounded history; choosing the pair handles exhaustion of the selected catalogue.
-        if (room.usedWords.length > 1000) room.usedWords.splice(0, 500);
+        recordWordSelection(room.usedWords, pair.id);
         room.chat = []; room.chatReactions.clear();
         for (const p of players) { p.waiting = false; p.alive = true; p.ready = false; }
         room.voiceGeneration++;

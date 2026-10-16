@@ -10,6 +10,7 @@ import { DEFAULT_APPEARANCE, EnvelopeSchema, MoveSchema, type Ack, type ClientEv
 import { createPersistence, type Persistence, type Guest } from './persistence.js';
 import { readConfig, type Config } from './config.js';
 import { Rooms, MemoryRoomStore, type Room } from './rooms.js';
+import type { WordPair } from '@rene/engine';
 import { SerialQueue, TokenBucket } from './queue.js';
 import { VoiceService } from './voice.js';
 import { allowsRealtimeRequest } from './origin.js';
@@ -17,7 +18,7 @@ import { allowsRealtimeRequest } from './origin.js';
 const COOKIE = 'rene_guest';
 const hash = (token: string) => createHash('sha256').update(token).digest('hex');
 type GameSocket = Socket<ClientEvents, ServerEvents, Record<string, never>, { guest: Guest }>;
-export interface AppOptions { config?: Config; persistence?: Persistence; timers?: boolean; logger?: boolean; webRoot?: string }
+export interface AppOptions { config?: Config; persistence?: Persistence; timers?: boolean; logger?: boolean; webRoot?: string; wordPairs?: readonly WordPair[] }
 
 export async function createApp(options: AppOptions = {}) {
   const config = options.config ?? readConfig();
@@ -25,7 +26,7 @@ export async function createApp(options: AppOptions = {}) {
   const app = Fastify({ logger: options.logger ?? true, bodyLimit: 8192, trustProxy: config.TRUST_PROXY ?? false });
   await app.register(cookie);
   await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
-  const rooms = new Rooms(new MemoryRoomStore(), persistence, config.MAX_ROOMS, undefined, error => app.log.error({ err: error }, 'Sauvegarde des résultats, nouvelle tentative dans 5 secondes'));
+  const rooms = new Rooms(new MemoryRoomStore(), persistence, config.MAX_ROOMS, undefined, error => app.log.error({ err: error }, 'Sauvegarde des résultats, nouvelle tentative dans 5 secondes'), options.wordPairs);
   const queue = new SerialQueue();
   const players = new Map<string, GameSocket>();
   const recent = new Map<string, Map<string, { fingerprint: string; ack: Ack }>>();

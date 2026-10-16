@@ -43,6 +43,14 @@ describe('HTTP files and guest sessions with real Fastify plugins', () => {
     }
   });
 
+  it('never serves the server catalogue or source through production static routes', async () => {
+    for (const url of ['/packages/engine/src/words.ts', '/packages/engine/src/word-data/cinema.json', '/apps/server/dist/index.js.map', '/@fs/packages/engine/src/words.ts']) {
+      const response = await running!.app.inject({ method: 'GET', url });
+      expect(response.body === indexHtml || response.statusCode === 404).toBe(true);
+      expect(response.body.includes('v14-') || response.body.includes('clueAxes')).toBe(false);
+    }
+  });
+
   it.each(['/', '/index.html', '/salon/ABCDEF?invitation=1'])(
     'serves the application at %s without listening on a network port', async url => {
       const response = await running!.app.inject({ method: 'GET', url });
