@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { joinFour } from './helpers';
+import { joinFour, showPanel } from './helpers';
 
 async function pose(page: Page, name: string) {
   return page.evaluate(async name => {
@@ -109,12 +109,15 @@ test('mobile creation, local avatar persistence and text conversation', async ({
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.getByRole('button', { name: /Ça, c’est moi/ }).click();
     await page.getByRole('button', { name: /Créer un salon/ }).click();
+    await showPanel(page, 'Suspects');
     await expect(page.getByRole('heading', { name: /Les suspects/ })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.getByRole('button', { name: /^Menu/ }).click();
     await page.getByRole('button', { name: 'Comment jouer ?', exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.getByRole('button', { name: 'Fermer', exact: true }).click();
     await page.reload();
+    await showPanel(page, 'Suspects');
     await expect(page.getByText('Renée mobile (vous)', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Je suis prêt →', exact: true })).toBeVisible();
   } finally { await context.close(); }

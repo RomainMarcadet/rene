@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { joinFour } from './helpers';
+import { joinFour, showPanel } from './helpers';
 
 async function state(page: Page) {
   return page.evaluate(async () => {
@@ -40,6 +40,7 @@ test('four clients react, unanimously start voting and reveal White before a tol
     const word = initial.find(s => s.secret.word !== null)!.secret.word as string;
     expect(white).toBeGreaterThanOrEqual(0);
     await describe(pages);
+    await showPanel(pages[3], 'Discussion');
     await host.getByLabel('Message au salon').fill('Je soupçonne tout le monde, surtout Lou.');
     await host.getByRole('button', { name: 'Envoyer le message' }).click();
     const up = (page: Page) => page.getByRole('button', { name: 'Soutenir le message de Camille', exact: true });

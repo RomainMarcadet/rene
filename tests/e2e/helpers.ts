@@ -16,8 +16,26 @@ export async function joinFour(browser: Browser, baseURL: string, mobileIndex = 
     await pages[i].goto(`/?room=${code}`);
     await pages[i].getByLabel('Pseudonyme').fill(names[i]);
     await pages[i].getByRole('button', { name: /Rejoindre →/ }).click();
-    await expect(pages[i].getByRole('heading', { name: /Les suspects/ })).toBeVisible();
+    await expect(pages[i].locator('.room-code')).toBeVisible();
+    await expect(pages[i].locator('.participants > li')).toHaveCount(i + 1);
   }
   return { contexts, pages, names };
+}
+
+export async function showPanel(page: Page, panel: 'Suspects' | 'Indices' | 'Discussion') {
+  await expect(page.locator('.room-code')).toBeVisible();
+  const button = page.getByRole('navigation', { name: 'Panneaux du salon' }).getByRole('button', { name: new RegExp(`^${panel}`) });
+  if (await button.isVisible() && await button.getAttribute('aria-expanded') !== 'true') await button.click();
+}
+
+export async function voiceSettings(page: Page) {
+  const details = page.locator('.voice-settings');
+  if (await details.getAttribute('open') === null) await details.locator('summary').click();
+}
+
+export async function setMicrophoneMode(page: Page, mode: 'open' | 'ptt') {
+  await voiceSettings(page);
+  await page.getByLabel('Mode du microphone').selectOption(mode);
+  await page.locator('.voice-settings summary').click();
 }
 
