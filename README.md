@@ -19,6 +19,8 @@ npm run dev
 
 Ouvrir **http://localhost:5173**. Le client Vite relaie `/api` et `/socket.io` au serveur local sur le port 3001. Le fichier `.env` est chargé par le script de développement du serveur. Les identifiants contenus dans `.env.example` sont réservés au développement local.
 
+`npm run dev` génère automatiquement le client Prisma avant de démarrer le serveur et Vite, notamment après une réinstallation des dépendances. Cette génération ne modifie pas la base de données. Pour les commandes de build, de contrôle ou le lancement direct du workspace serveur, conserver l’étape explicite `npm run db:generate`. L’erreur `@prisma/client did not initialize yet` indique un client non généré ; les erreurs Vite `ECONNREFUSED 127.0.0.1:3001` en découlent si le backend s’est arrêté.
+
 PostgreSQL est exposé sur **localhost:5433** pour cohabiter avec une installation locale utilisant déjà 5432. Si ce port est occupé, choisir un autre `POSTGRES_PORT` dans `.env` et reporter la même valeur dans `DATABASE_URL`, puis relancer `docker compose up -d postgres livekit`. Les connexions entre conteneurs utilisent `postgres:5432`.
 
 Le `package-lock.json` inclut les [correctifs de l'audit npm](docs/dependencies.md). `npm ci` reproduit les versions verrouillées en local, dans Docker et dans la CI. Après une modification des dépendances, utiliser `npm install`, relancer les contrôles et `npm audit`, puis conserver le verrou avec les manifestes.
@@ -57,7 +59,7 @@ Le bouton **COMMENT JOUER ?** sur l’accueil et **Comment jouer ?** dans le sal
 
 | Commande | Effet |
 | --- | --- |
-| `npm run dev` | Serveur et client avec rechargement |
+| `npm run dev` | Générer le client Prisma, puis lancer serveur et client avec rechargement |
 | `npm run check` | Types, lint, tests unitaires/intégration, puis build |
 | `npm test` | Tests Vitest |
 | `npx playwright install chromium` | Installer Chromium pour les tests navigateur |

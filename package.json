@@ -3,6 +3,7 @@
   "workspaces": ["apps/*", "packages/*"],
   "engines": {"node": ">=24.0.0"},
   "scripts": {
+    "predev": "npm run db:generate",
     "dev": "concurrently -k -n server,web \"npm run dev -w @rene/server\" \"npm run dev -w @rene/web\"",
     "build": "npm run build -w @rene/web && npm run build -w @rene/server",
     "typecheck": "tsc --noEmit",
