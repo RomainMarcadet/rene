@@ -1,0 +1,86 @@
+{
+  "version": "1.4",
+  "reviewedAt": "2026-10-16",
+  "reviewer": "authoring-agent",
+  "reviewedEntries": 1500,
+  "blindHumanPlaytest": false,
+  "method": [
+    "shared-clue-axes",
+    "balanced-recognition",
+    "distinct-references",
+    "no-unsubstantiated-allegations",
+    "difficulty-calibration",
+    "canonical-deduplication"
+  ],
+  "revisedEntryIds": [
+    "v14-internet-h006",
+    "v14-internet-h010",
+    "v14-internet-h011",
+    "v14-internet-h013",
+    "v14-internet-h014",
+    "v14-internet-h016",
+    "v14-internet-h019",
+    "v14-cinema-e028",
+    "v14-sport-h013",
+    "v14-politique-m024",
+    "v14-politique-m043",
+    "v14-politique-h007",
+    "v14-politique-h015",
+    "v14-cuisine-e026",
+    "v14-histoire-e027",
+    "v14-histoire-e030",
+    "v14-sciences-e013",
+    "v14-sciences-h013",
+    "v14-sciences-h020",
+    "v14-culture-e009",
+    "v14-culture-e022",
+    "v14-culture-m029",
+    "v14-voyage-e031",
+    "v14-voyage-h016",
+    "v14-musique-m043",
+    "v14-politique-h012",
+    "v14-histoire-m007",
+    "v14-sciences-h003",
+    "v14-cuisine-e027",
+    "v14-internet-e020",
+    "v14-television-e019",
+    "v14-television-m023",
+    "v14-histoire-e014",
+    "v14-nature-h014"
+  ],
+  "sources": [
+    {
+      "id": "primary-01",
+      "checkedAt": "2026-10-16",
+      "url": "https://www.nintendo.com/fr-fr/Hardware/Nintendo-Switch-2/Nintendo-Switch-2-2785301.html",
+      "entryIds": [
+        "v14-jeux-video-m044"
+      ]
+    },
+    {
+      "id": "primary-02",
+      "checkedAt": "2026-10-16",
+      "url": "https://runway.com/news/research/towards-instant-video-generation",
+      "entryIds": [
+        "v14-technologie-m020"
+      ]
+    },
+    {
+      "id": "primary-03",
+      "checkedAt": "2026-10-16",
+      "url": "https://openai.com/index/sora/",
+      "entryIds": [
+        "v14-technologie-m020"
+      ],
+      "historicalReferenceRetained": true
+    },
+    {
+      "id": "primary-04",
+      "checkedAt": "2026-10-16",
+      "url": "https://www.msf.fr/actualites/a-quoi-vont-servir-les-dons-de-stream-for-humanity-i-et-ii",
+      "entryIds": [
+        "v14-internet-m019"
+      ]
+    }
+  ]
+}

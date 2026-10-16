@@ -132,6 +132,8 @@ Le fichier d'exemple refuse volontairement de générer une configuration tant q
 - `deploy` : configuration locale, génération de la configuration HTTPS/TURN de production.
 - `docs` : architecture, roadmap, exploitation et recette.
 
+La V1.4 ajoute **1 500 paires**, pour **1 620 au total**, dans quinze catégories. Le catalogue reste côté serveur ; les tests navigateur utilisent des données fictives pour préserver la découverte. `npm run words:check` affiche uniquement les statistiques et contrôles, et `npm run words:boundary` vérifie les ressources frontend après le build. Voir le [rapport V1.4 sans spoiler](docs/v1.4.md) pour les distributions, le tirage, la méthode éditoriale et les validations.
+
 Les salles et les parties actives résident en mémoire dans **une seule instance applicative**. Un redémarrage termine ces salles ; PostgreSQL conserve les profils invités et les résultats déjà enregistrés, mais ne permet pas de reprendre une partie interrompue. Le classement affiché appartient à la session en cours. Les résultats archivés ne disposent pas encore d'un écran de consultation.
 
 Supprimer les cookies fait perdre l'identité invitée et l'accès à sa place ; aucun mécanisme de récupération de compte n'est proposé. Les salons sans personne connectée expirent après 30 minutes. Le vocal auto-hébergé et le repli TURN doivent être validés sur les réseaux réels de la recette avant diffusion publique. La présence de la configuration Docker ne constitue pas à elle seule une validation de déploiement.
