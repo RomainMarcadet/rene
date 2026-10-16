@@ -388,3 +388,25 @@ describe('discussion readiness unanimity', () => {
     expect(act(game, { type: 'skipDiscussion' }).phase).toBe('vote');
   });
 });
+
+
+describe('tolerant White guessing preserves the single attempt and scoring', () => {
+  it.each(['balais', 'balaai', ' BALAI ! '])('wins for %s once after elimination', proposal => {
+    let game = fixture(4, { automaticRoles: false, undercoverCount: 0, whiteCount: 1 });
+    game.words.civilian = 'Balai';
+    const white = players(game, 'white')[0]; game = votedOut(game, white);
+    const before = publicGame(game); expect(JSON.stringify(before)).not.toContain('Balai');
+    game = act(game, { type: 'guess', playerId: white, word: proposal });
+    expect(game.result).toMatchObject({ winner: 'white', winnerIds: [white], points: { [white]: 6 } });
+    expect(Object.values(game.result!.points).reduce((a, b) => a + b, 0)).toBe(6);
+    expect(() => act(game, { type: 'guess', playerId: white, word: proposal })).toThrow();
+  });
+  it('still rejects a different short word and consumes the only attempt', () => {
+    let game = fixture(4, { automaticRoles: false, undercoverCount: 0, whiteCount: 1 }); game.words.civilian = 'Char';
+    const white = players(game, 'white')[0]; game = votedOut(game, white);
+    game = act(game, { type: 'guess', playerId: white, word: 'chat' });
+    expect(game.phase).toBe('elimination'); expect(game.result).toBeNull();
+    expect(() => act(game, { type: 'guess', playerId: white, word: 'char' })).toThrow();
+    expect(expire(game).result?.winner).toBe('civilians');
+  });
+});

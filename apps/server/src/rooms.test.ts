@@ -327,3 +327,22 @@ describe('discussion readiness service', () => {
     await other.rooms.tick(other.room, other.room.game!.deadline!); expect(other.room.game!.phase).toBe('vote');
   });
 });
+
+
+it('reveals only eliminated roles, including White before the guess, and resets on replay', async () => {
+  for (const role of ['civilian', 'undercover', 'white'] as const) {
+    const { rooms, room } = await fixture(6); await start(rooms, room);
+    const now = await votePhase(rooms, room); const target = room.game!.alive.find(id => room.game!.roles[id] === role)!;
+    await eliminate(rooms, room, target, now);
+    let projection = rooms.snapshot(room, now + 20);
+    expect(projection.players.find(p => p.id === target)).toMatchObject({ alive: false, role });
+    expect(projection.players.filter(p => p.alive).every(p => p.role === undefined)).toBe(true);
+    const living = room.game!.alive[0]; rooms.disconnected(room, living, now + 21);
+    expect(rooms.snapshot(room, now + 21).players.find(p => p.id === living)).toMatchObject({ connected: false, alive: true });
+    expect(rooms.snapshot(room, now + 21).players.find(p => p.id === living)!.role).toBeUndefined();
+    if (role === 'white') expect(room.game!.phase).toBe('whiteGuess');
+    else { await rooms.tick(room, room.game!.deadline!); projection = rooms.snapshot(room, now + 25); expect(projection.players.find(p => p.id === target)!.role).toBe(role); }
+    room.game!.phase = 'results'; await rooms.command(room, room.hostId, { type: 'game.next' }, now + 30);
+    expect(rooms.snapshot(room, now + 30).players.every(p => p.role === undefined && p.alive)).toBe(true);
+  }
+});

@@ -184,6 +184,28 @@ describe('real Socket.IO clients', () => {
     expect(actors.every(a => a.snapshot?.players.every(p => !p.role))).toBe(true);
   });
 
+  it('reveals White to all clients, accepts balais for balai and rejects a second guess', async () => {
+    const { running, actors, room } = await opened();
+    room.settings = { ...room.settings, automaticRoles: false, undercoverCount: 0, whiteCount: 1 };
+    for (const a of actors) await send(a, { type: 'player.ready', ready: true });
+    await send(actors[0], { type: 'game.start' });
+    room.game!.words.civilian = 'Balai'; // controlled server fixture; no production override/API
+    await expire(running, room, actors[0]);
+    while (room.game!.phase === 'description') await send(actors.find(a => a.playerId === room.game!.turnPlayerId)!, { type: 'game.describe', text: 'Indice' }, { phaseId: room.game!.phaseId });
+    for (const a of actors) await send(a, { type: 'game.setVoteReady', ready: true }, { phaseId: room.game!.phaseId });
+    const white = actors.find(a => room.game!.roles[a.playerId] === 'white')!;
+    for (const a of actors) await send(a, { type: 'game.vote', targetId: a === white ? actors.find(other => other !== white)!.playerId : white.playerId }, { phaseId: room.game!.phaseId });
+    await expect.poll(() => actors.every(a => a.snapshot?.game?.phase === 'whiteGuess')).toBe(true);
+    expect(actors.every(a => a.snapshot!.players.find(p => p.id === white.playerId)?.role === 'white')).toBe(true);
+    expect(actors.every(a => a.snapshot!.players.filter(p => p.alive).every(p => !p.role))).toBe(true);
+    expect(actors.every(a => !JSON.stringify(a.snapshot).includes('Balai'))).toBe(true);
+    const phaseId = room.game!.phaseId;
+    expect((await send(white, { type: 'game.guess', word: 'balais' }, { phaseId })).ok).toBe(true);
+    await expect.poll(() => actors.every(a => a.snapshot?.game?.result?.winner === 'white')).toBe(true);
+    expect(actors.every(a => a.snapshot!.players.find(p => p.id === white.playerId)?.score === 6)).toBe(true);
+    expect((await send(white, { type: 'game.guess', word: 'balai' }, { phaseId })).ok).toBe(false);
+  });
+
   it('recovers the same place after refresh and replaces a second controlling connection', async () => {
     const { running, url, actors, room } = await opened();
     for (const a of actors) await send(a, { type: 'player.ready', ready: true });

@@ -1,5 +1,7 @@
 import { SettingsSchema, roleCounts, validComposition, type GameResult, type Phase, type PrivateGameState, type PublicGame, type Role, type RoomSettings, type Winner } from '@rene/contracts';
 import type { WordPair } from './words.js';
+import { normalizeGuess, isAcceptableWhiteGuess } from './whiteGuess.js';
+export { normalizeGuess, isAcceptableWhiteGuess } from './whiteGuess.js';
 
 /** Server-only state. Always project through publicGame/privateGame before sending. */
 export interface GameState extends PublicGame {
@@ -41,10 +43,6 @@ function shuffled<T>(values: readonly T[], random: Random): T[] {
     [result[i], result[j]] = [result[j], result[i]];
   }
   return result;
-}
-
-export function normalizeGuess(value: string): string {
-  return value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase('fr').trim().replace(/\s+/gu, ' ');
 }
 
 export function createGame(input: {
@@ -259,7 +257,7 @@ export function applyGameAction(previous: GameState, action: GameAction, now: nu
       break;
     case 'guess':
       requireRule(game.phase === 'whiteGuess' && game.whitePlayerId === action.playerId && !game.departed.includes(action.playerId), 'Vous ne pouvez pas deviner maintenant.');
-      if (normalizeGuess(validatedText(action.word)) === normalizeGuess(game.words.civilian)) finish(game, 'white', now, action.playerId);
+      if (isAcceptableWhiteGuess(validatedText(action.word), game.words.civilian)) finish(game, 'white', now, action.playerId);
       else { game.whitePlayerId = null; enter(game, 'elimination', now, 3); }
       break;
   }
