@@ -39,10 +39,9 @@ export function Voice({ generation }: { generation: number }) {
       window.removeEventListener('blur', stop); document.removeEventListener('visibilitychange', stop); document.removeEventListener('focusin', focus);
     };
   }, [permitted, mode, generation, setWanted]);
-  return <section className="voice-panel" aria-label="Commandes du vocal"><div ref={voice.audio} hidden />{available ? <>
+  return <section className="voice-panel" aria-label="Commandes du vocal" data-occluder><div ref={voice.audio} hidden />{available ? <>
     <div className="voice-header"><span className={`status-dot ${voice.connected ? '' : 'offline'}`} /><strong>{enabled ? 'Le salon vocal' : 'On se parle ?'}</strong></div>
     <p role="status">{enabled ? voice.status : 'Rejoignez pour écouter. Maintenez V pour parler.'}</p>
-    <label className="field voice-mode">Mode du microphone<select aria-label="Mode du microphone" value={mode} onChange={event => { holds.current.clear(); setWanted(false); setMode(event.target.value as MicrophoneMode); }}><option value="ptt">Maintenir pour parler · V (recommandé)</option><option value="open">Microphone ouvert · bouton marche / arrêt</option></select></label>
     <div className="voice-actions">{!enabled ? <button className="button button-dark" onClick={() => setEnabled(true)}>Rejoindre le vocal ↗</button> : <>
       <span className={`microphone-state ${voice.microphone ? 'transmitting' : ''}`} role="status">{voice.microphone ? '● Microphone : ouvert · transmission' : '○ Microphone : coupé'}{!voice.canPublish && ' · Écoute seule'}</span>
       {mode === 'ptt' ? <button className={`button talk-button ${voice.microphone ? 'button-green' : 'button-yellow'}`} disabled={!permitted} aria-pressed={voice.microphone}
@@ -52,9 +51,14 @@ export function Voice({ generation }: { generation: number }) {
         onKeyUp={event => { if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); hold('button-key', false); } }}>Maintenir pour parler · V</button>
         : <button className={`button ${voice.microphone ? 'button-green' : 'button-cream'}`} disabled={!permitted} onClick={() => setWanted(!voice.microphone)}>{voice.microphone ? 'Couper mon microphone' : 'Ouvrir mon microphone'}</button>}
       <button className="button button-cream" aria-pressed={!voice.listening} onClick={() => voice.setListening(!voice.listening)}>{voice.listening ? 'Écoute : activée' : 'Écoute : désactivée'}</button>
-      <button className="text-button" onClick={() => { holds.current.clear(); setWanted(false); setEnabled(false); }}>Quitter le vocal</button>
     </>}</div>
-    {enabled && mode === 'ptt' && <p className="hint">Gardez V ou le bouton enfoncé. Le micro reste coupé pendant la saisie et se coupe si vous quittez la fenêtre.</p>}
+    <details className="voice-settings" onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}><summary>Réglages du vocal</summary>
+      <div className="voice-settings-content" data-occluder>
+      <label className="field voice-mode">Mode du microphone<select aria-label="Mode du microphone" value={mode} onChange={event => { holds.current.clear(); setWanted(false); setMode(event.target.value as MicrophoneMode); }}><option value="ptt">Maintenir pour parler · V (recommandé)</option><option value="open">Microphone ouvert · bouton marche / arrêt</option></select></label>
+      <p className="hint">Gardez V ou le bouton enfoncé. Le micro se coupe pendant la saisie et si vous quittez la fenêtre.</p>
+      {enabled && <button className="text-button" onClick={() => { holds.current.clear(); setWanted(false); setEnabled(false); }}>Quitter le vocal</button>}
+      </div>
+    </details>
     {voice.audioBlocked && enabled && <button className="button button-yellow" onClick={() => void voice.startAudio()}>Activer le son du navigateur →</button>}
   </> : <><strong>Le chat est ouvert.</strong><p>Le vocal n’est pas configuré sur ce salon.</p></>}</section>;
 }

@@ -1,21 +1,33 @@
 import { useEffect, useRef } from 'react';
 import type { Description, PublicGame, PublicPlayer } from '@rene/contracts';
+import { AvatarPortrait } from './AvatarPortrait';
 
 export function DescriptionHistory({ game, players, visible }: { game: PublicGame | null; players: PublicPlayer[]; visible: boolean }) {
-  const descriptions = game?.descriptions ?? []; const open = game?.phase !== 'results';
-  const list = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (list.current) list.current.scrollTop = 0; }, [descriptions.length, visible]);
-  if (!descriptions.length) return null;
-  // Copy/group the projection: keep the server's turn order inside each round.
-  const rounds = [...new Set(descriptions.map(d => d.round))].sort((a, b) => b - a);
-  const latest = descriptions[descriptions.length - 1];
-  const name = (id: string) => players.find(p => p.id === id)?.name ?? 'Joueur';
-  const text = (d: Description) => d.timedOut ? '… temps écoulé' : d.text;
-  return <details className="description-history" open={open}>
-    <summary>Les indices du salon <span>{descriptions.length}</span></summary>
-    <p className="latest-clue" aria-live="polite"><span className="eyebrow">DERNIER INDICE · TOUR {latest.round}</span><strong>{name(latest.playerId)}</strong> : {text(latest)}</p>
-    <div className="history-rounds" ref={list}>{rounds.map(round => <section key={round} aria-label={`Indices du tour ${round}`}>
-      <h3>TOUR {round}</h3><ol>{descriptions.filter(d => d.round === round).map(d => <li key={`${d.playerId}-${d.round}`}><strong>{name(d.playerId)}</strong><span>{text(d)}</span></li>)}</ol>
-    </section>)}</div>
-  </details>;
+  const list = useRef<HTMLDivElement>(null); const current = useRef<HTMLElement>(null);
+  const descriptions = game?.descriptions ?? [];
+  useEffect(() => {
+    if (!visible || !list.current) return;
+    list.current.scrollTop = 0;
+    current.current?.querySelector('[data-latest]')?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+  }, [descriptions.length, visible]);
+  const rounds = [...new Set([...(game ? [game.round] : []), ...descriptions.map(d => d.round)])].sort((a, b) => b - a);
+  const latest = descriptions.at(-1);
+  function card(id: string, description?: Description) {
+    const player = players.find(p => p.id === id);
+    const active = !description && game?.phase === 'description' && game.turnPlayerId === id;
+    const text = description ? description.timedOut ? '… temps écoulé' : description.text : active ? 'Cherche son indice…' : 'Indice attendu';
+    return <li key={id} className={`${active ? 'clue-active' : ''} ${!description ? 'clue-pending' : ''} ${description?.timedOut ? 'clue-expired' : ''}`} data-latest={description === latest && !!description ? '' : undefined}>
+      <div className="clue-author">{player && <AvatarPortrait appearance={player.appearance} />}<strong>{player?.name ?? 'Joueur parti'}</strong></div><span>{text}</span>
+    </li>;
+  }
+  return <section className="description-history" aria-label="Les indices du salon"><div className="panel-label"><h3>Les indices du salon <span>{descriptions.length}</span></h3><span className="eyebrow">ON VOUS ÉCOUTE.</span></div>
+    {!game ? <p className="clues-empty">Les premiers indices arriveront avec la partie.</p> : <>
+      <p className="latest-clue sr-only" aria-live="polite">{latest ? `${players.find(p => p.id === latest.playerId)?.name ?? 'Joueur'} : ${latest.timedOut ? 'temps écoulé' : latest.text}` : 'En attente du premier indice.'}</p>
+      <div className="history-rounds" ref={list}>{rounds.map((round, index) => {
+        const clues = descriptions.filter(d => d.round === round);
+        const content = <ol>{clues.map(d => card(d.playerId, d))}{round === game.round && game.order.filter(id => !clues.some(d => d.playerId === id) && players.some(p => p.id === id && p.alive && !p.waiting)).map(id => card(id))}</ol>;
+        return index === 0 ? <section key={round} ref={current} aria-label={`Indices du tour ${round}`}><h3>TOUR {round}</h3>{content}</section> : <section key={round} aria-label={`Indices du tour ${round}`}><details><summary>TOUR {round} · {clues.length} indices</summary>{content}</details></section>;
+      })}</div>
+    </>}
+  </section>;
 }

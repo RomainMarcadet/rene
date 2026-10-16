@@ -11,7 +11,7 @@ export function RoomNavigation({ room, compact, onOpen, onInvite }: { room: Room
     <a className="wordmark" href="#" onClick={e => { e.preventDefault(); onOpen('leave'); }}>RENÉ<span className="wordmark-dot">®</span></a>
     <div className="room-code"><span>LE SALON</span><button onClick={() => void onInvite()} title="Copier le lien d’invitation" aria-label={`Inviter dans le salon ${room.code}`}>{room.code} <small>↗</small></button></div>
     <button ref={menuButton} className="nav-menu-toggle" hidden={!compact} aria-expanded={menu} aria-controls="room-navigation-actions" onClick={() => setMenu(!menu)}>Menu {menu ? '×' : '☰'}</button>
-    <div id="room-navigation-actions" className="header-actions" hidden={compact && !menu} aria-label="Navigation du salon">
+    <div id="room-navigation-actions" className="header-actions" hidden={compact && !menu} aria-label="Navigation du salon" data-occluder>
       <Sound phaseId={room.game?.phaseId} phase={room.game?.phase} />
       <button className="text-button" onClick={() => onOpen('help')}>Comment jouer ?</button>
       {host && !active && <button className="text-button" onClick={() => onOpen('settings')}>Paramètres ⚙</button>}
