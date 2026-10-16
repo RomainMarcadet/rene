@@ -148,6 +148,25 @@ describe('real Socket.IO clients', () => {
     expect(Number.isFinite(room.players.get(moving.playerId)!.position.x)).toBe(true);
   });
 
+  it('synchronizes simultaneous reactions, rejects invalid payloads and restores the local choice on reconnect', async () => {
+    const { running, url, actors, room } = await opened();
+    expect((await send(actors[0], { type: 'chat.send', text: 'René est très louche.' })).ok).toBe(true);
+    const id = room.chat[0].id;
+    const react = (index: number, reaction: 'up' | 'down' | null) => send(actors[index], { type: 'chat.react', messageId: id, reaction });
+    expect((await Promise.all([react(0, 'up'), react(1, 'up'), react(2, 'down')])).every(ack => ack.ok)).toBe(true);
+    await expect.poll(() => actors.map(a => a.snapshot?.chat[0].reactions)).toEqual(Array(4).fill({ up: 2, down: 1 }));
+    const revision = room.revision;
+    await react(1, 'up'); expect(room.revision).toBe(revision);
+    await react(1, 'down'); await react(0, null);
+    await expect.poll(() => actors.every(a => a.snapshot?.chat[0].reactions.down === 2)).toBe(true);
+    const old = actors[1]; old.socket.disconnect();
+    actors[1] = await actor(running, url, old); await send(actors[1], { type: 'room.resume' });
+    await expect.poll(() => actors[1].secret?.chatReactions[id]).toBe('down');
+    expect((await send(actors[0], { type: 'chat.react', messageId: 'absent', reaction: 'up' })).ok).toBe(false);
+    expect((await send(actors[0], { type: 'chat.react', messageId: id, reaction: 'invalid' } as unknown as Command)).ok).toBe(false);
+    expect(actors.every(a => a.snapshot?.players.every(p => p.score === 0))).toBe(true);
+  });
+
   it('recovers the same place after refresh and replaces a second controlling connection', async () => {
     const { running, url, actors, room } = await opened();
     for (const a of actors) await send(a, { type: 'player.ready', ready: true });

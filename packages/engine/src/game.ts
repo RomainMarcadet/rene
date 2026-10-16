@@ -1,4 +1,4 @@
-import { SettingsSchema, roleCounts, validComposition, type GameResult, type Phase, type PrivatePlayerState, type PublicGame, type Role, type RoomSettings, type Winner } from '@rene/contracts';
+import { SettingsSchema, roleCounts, validComposition, type GameResult, type Phase, type PrivateGameState, type PublicGame, type Role, type RoomSettings, type Winner } from '@rene/contracts';
 import type { WordPair } from './words.js';
 
 /** Server-only state. Always project through publicGame/privateGame before sending. */
@@ -267,7 +267,7 @@ export function publicGame(game: GameState): PublicGame {
 }
 
 /** Ordinary players only learn their word, never whether it belongs to the majority. */
-export function privateGame(game: GameState, playerId: string): PrivatePlayerState {
+export function privateGame(game: GameState, playerId: string): PrivateGameState {
   const inGame = game.playerIds.includes(playerId) && !game.departed.includes(playerId);
   const role = inGame ? game.roles[playerId] : undefined;
   return { playerId, inGame, word: role === 'civilian' ? game.words.civilian : role === 'undercover' ? game.words.undercover : null, voteTarget: inGame && Object.hasOwn(game.ballots, playerId) ? game.ballots[playerId] : null };

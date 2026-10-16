@@ -136,7 +136,8 @@ export async function createApp(options: AppOptions = {}) {
           if (!active(socket)) throw new Error('Cette place est ouverte dans un autre onglet.');
           let room = rooms.roomFor(guest.id);
           const now = Date.now();
-          if (room) { await rooms.tick(room, now); broadcast(room); }
+          if (room && await rooms.tick(room, now)) broadcast(room);
+          const priorRevision = room?.revision;
           if (command.type.startsWith('game.') && command.type !== 'game.start' && command.type !== 'game.next') {
             if (!room?.game || envelope.phaseId !== room.game.phaseId) throw new Error('Cette phase est terminée. La partie a été actualisée.');
           }
@@ -172,7 +173,7 @@ export async function createApp(options: AppOptions = {}) {
               if (!room) throw new Error('Rejoins une salle pour continuer.');
               await rooms.command(room, guest.id, command, now);
           }
-          if (room) broadcast(room);
+          if (room && room.revision !== priorRevision) broadcast(room);
           return { ok: true, ...(room ? { code: room.code } : {}) };
         });
         const history = recent.get(guest.id) ?? new Map<string, { fingerprint: string; ack: Ack }>();
