@@ -40,7 +40,8 @@ Ouvrir alors **http://localhost:8080**, sans lancer `npm run dev` en parallèle.
 3. Chaque personne rejoint depuis son navigateur, personnalise son avatar et indique qu'elle est prête.
 4. L'hôte choisit les paramètres et lance la partie. Chaque personne voit uniquement son mot, sans savoir si elle est Civil ou Undercover. Mr. White n'a aucun mot.
 5. Décrire son mot à son tour, discuter, puis voter. Un Mr. White éliminé peut deviner le mot des Civils une seule fois.
-6. Aux résultats, l'hôte retourne au salon pour préparer la partie suivante. Le classement se cumule pendant le nombre de parties configuré, puis une nouvelle session commence.
+6. Pendant la discussion, chaque vivant peut confirmer être prêt à voter : l’unanimité ouvre immédiatement le vote ; sinon le chronomètre continue.
+7. Aux résultats, l'hôte retourne au salon pour préparer la partie suivante. Le classement se cumule pendant le nombre de parties configuré, puis une nouvelle session commence.
 
 Déplacements : **ZQSD/WASD**, flèches, ou commandes tactiles. Les déplacements restent libres pendant la partie, sauf pendant le vote et le départage : les vivants rejoignent la table, puis repartent de cette position. Les emotes restent disponibles pour les joueurs autorisés. Pour le vocal, rejoindre le salon puis **maintenir V** ou le bouton tactile pour parler (mode par défaut). Le mode microphone ouvert s’active séparément. **Microphone**, **écoute** et **quitter le vocal** ont chacun leur commande ; le bouton d’un participant coupe seulement son son localement. Une perte de focus, une reconnexion ou un changement de génération vocale coupe la transmission : réactivez-la volontairement.
 
@@ -50,7 +51,7 @@ Pour tester quatre joueurs sur un même ordinateur, utiliser **quatre profils de
 
 Si `/api/session` répond `200` mais que le salon ne se connecte pas, vérifier **l'adresse réellement ouverte dans le navigateur** : elle doit correspondre à `WEB_ORIGIN` (protocole, hôte et port, sans chemin). Par exemple, pour `http://192.168.1.50:5173`, définir cette même valeur puis redémarrer `npm run dev`. Le proxy doit conserver l'en-tête `Host`. Le serveur journalise l'origine attendue au démarrage et les refus de connexion temps réel. Vite conserve désormais le port 5173 au lieu d'en choisir silencieusement un autre s'il est occupé.
 
-Le bouton **COMMENT JOUER ?** sur l’accueil et **Comment jouer ?** dans le salon ouvrent les mêmes règles illustrées. Pendant une description, une carte affiche le portrait, le nom et le chronomètre du joueur actif ; les éliminés sont marqués en rouge avec des yeux rouges. Le dernier indice reste en tête de l’historique, suivi des tours récents.
+Le bouton **COMMENT JOUER ?** sur l’accueil et **Comment jouer ?** dans le salon ouvrent les mêmes règles illustrées. Pendant une description, une carte affiche le portrait, le nom et le chronomètre du joueur actif ; les éliminés sont marqués en rouge avec des yeux rouges. Le dernier indice reste en tête de l’historique, suivi des tours récents. Les cartes des éliminés conservent aussi leur rôle révélé. Sous chaque message du chat, ▲ soutient et ▼ désapprouve : une seule réaction par joueur, modifiable ou annulable, sans effet sur les points ni sur le vote officiel. Les permissions de parole s’appliquent également aux réactions.
 
 ## Commandes
 
@@ -69,6 +70,8 @@ Le bouton **COMMENT JOUER ?** sur l’accueil et **Comment jouer ?** dans le sal
 Playwright démarre ses serveurs isolés sur **5175** et **3005**, sans réutiliser votre serveur de développement. Le mode vocal suppose `docker compose up -d --wait livekit` et la configuration locale de `deploy/livekit.dev.yaml` sur 7880/7881/7882. Les tests n’utilisent pas de base de données ; les vérifications de persistance nécessitent PostgreSQL séparément. Les captures de recette sont écrites dans `output/playwright/` (non versionné).
 
 Le résultat des tests locaux et les vérifications restant à réaliser sont décrits dans [la recette](docs/acceptance.md). La CI prépare PostgreSQL, contrôle le code et exécute les tests navigateur. Aucun workflow ne publie d'image ni ne déploie automatiquement.
+
+La V1.2 ajoute les réactions de chat, le passage au vote à l’unanimité et les rôles éliminés persistants. La devinette de Mr. White accepte accents, pluriels connus et certaines petites fautes répertoriées (`balais`/`balaai` pour `balai`), avec une seule tentative. Le validateur reste conservateur : les synonymes et mots seulement ressemblants sont refusés. Les choix, limites et résultats figurent dans [le rapport V1.2](docs/v1.2.md).
 
 Les validations de la V1.1, le diagnostic audio et les limites de la recette sont détaillés dans [le compte rendu V1.1](docs/v1.1.md). La recette automatisée emploie des clients indépendants et des données serveur réelles ; l’écoute humaine, Safari/mobile physique et les réseaux distants restent à valider sur l’hébergement cible.
 
