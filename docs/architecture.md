@@ -33,7 +33,7 @@ stateDiagram-v2
   Distribution --> Description
   Description --> Description : joueur suivant
   Description --> Discussion : tous ont parlé
-  Discussion --> Vote
+  Discussion --> Vote : unanimité des vivants, hôte autorisé ou chronomètre
   Vote --> Departage : égalité
   Departage --> Elimination : vote, puis hasard si nécessaire
   Vote --> Elimination : majorité
@@ -55,7 +55,7 @@ Les mots et les rôles restent identiques pendant toute une partie. Un nouveau c
 
 Les événements sont définis dans `packages/contracts`. Le client émet `command` avec identifiant de commande et, pour les actions de jeu, identifiant de phase. L'accusé retourne un succès ou un message d'erreur. Les actions doublonnées ou concernant une ancienne phase ne doivent pas être exécutées à nouveau. Les mutations d'une salle et ses échéances sont sérialisées.
 
-Le serveur publie une `RoomSnapshot` explicite et un `PrivatePlayerState` par joueur. La projection privée contient son mot ou `null`, jamais son rôle Civil/Undercover. La projection publique révèle le rôle d'un éliminé et ne contient les deux mots et tous les rôles qu'aux résultats. La banque de mots est importée exclusivement par le serveur. Les mouvements transmettent une direction bornée ; le serveur calcule la position, limite la vitesse et applique les collisions du salon. `canMoveInPhase` dans les contrats autorise toutes les phases sauf vote/départage. À l’entrée en vote, le serveur place les vivants via `voteSeat`, sans replacer les éliminés ni les arrivants en attente. Les clients interpolent les positions ; elles restent les positions de départ après le vote.
+Le serveur publie une `RoomSnapshot` explicite et un `PrivatePlayerState` par joueur. Ce dernier étend le `PrivateGameState` du moteur avec les choix personnels de réactions, sans faire dépendre le moteur du chat. La projection privée contient son mot ou `null`, jamais son rôle Civil/Undercover. La projection publique révèle le rôle d'un éliminé et ne contient les deux mots et tous les rôles qu'aux résultats. La banque de mots est importée exclusivement par le serveur. Les mouvements transmettent une direction bornée ; le serveur calcule la position, limite la vitesse et applique les collisions du salon. `canMoveInPhase` dans les contrats autorise toutes les phases sauf vote/départage. À l’entrée en vote, le serveur place les vivants via `voteSeat`, sans replacer les éliminés ni les arrivants en attente. Les clients interpolent les positions ; elles restent les positions de départ après le vote.
 
 La connexion utilise une identité invitée par cookie HttpOnly. PostgreSQL conserve le **hash** du jeton et l'apparence, sans stocker le jeton brut. Un rafraîchissement récupère une projection fraîche. Deux onglets partageant un cookie ne constituent pas deux joueurs. L'hôte est transféré au participant connecté le plus ancien après 30 secondes d'absence, immédiatement s'il quitte explicitement.
 
@@ -79,3 +79,14 @@ La présentation du tour et des éliminés dérive uniquement de `RoomSnapshot`.
 `avatarPose` calcule une pose complète et sa priorité : élimination, victoire, emote, marche, repos. Les emotes utilisent l’échéance serveur ajustée par l’offset client. Le salut et la suspicion durent 3,5 secondes ; la danse conserve ses 2,5 secondes et le cooldown serveur reste de 2 secondes. Les mouvements réduits gardent des poses fixes et toutes les transformations sont réinitialisées à l’expiration.
 
 `useVoiceConnection` gère LiveKit et les abonnements distants. `MicrophoneController` sérialise la capture, avec priorité au relâchement même si une demande de permission est en cours. Le push-to-talk V/bouton tactile est le mode par défaut, le mode ouvert demande une activation volontaire. Les événements LiveKit fournissent l’état réel du micro. La sourdine d’écoute agit uniquement sur les éléments audio distants, indépendamment de la publication. Les changements de génération/connexion effacent l’intention de transmettre ; un décalage de credentials provoque une nouvelle tentative. Le transport LiveKit à deux connexions évite l’erreur de négociation SDP reproduite dans Chromium ; voir les preuves dans `v1.1.md`. Les jetons et la rotation serveur restent l’autorité de publication.
+
+
+## Interactions sociales V1.2
+
+`chat.react` fixe une réaction (`up`, `down`, `null`) par identité et message sous le verrou de salle existant. `Rooms` vérifie les mêmes permissions que le chat et la présence du message ; la projection publique expose deux compteurs, la projection privée uniquement le choix local. Les données restent en mémoire et sont effacées avec l’historique ou la partie. Les réactions sont indépendantes des scores et bulletins. Le tick et les commandes réussies diffusent selon les révisions modifiées pour éviter les snapshots de réaction sans changement.
+
+`game.setVoteReady` passe à l’action moteur `setVoteReady`. `readyToVotePlayerIds` est public, indépendant de la préparation au lobby. Tous les vivants comptent, déconnectés compris ; un départ définitif retire la confirmation et recalcule l’unanimité après les conditions de victoire. Chaque phase efface les confirmations. Une unanimité ouvre `vote` côté moteur sans déplacer l’échéance de discussion ; expiration et raccourci hôte restent disponibles. La transition réutilise le placement à table V1.1.
+
+La décision de `guess` utilise `isAcceptableWhiteGuess`, dans le moteur exclusivement. Normalisation Unicode, formes grammaticales éditoriales et fautes explicites sont acceptées ; les autres cas ne sont pas déduits d’une distance de caractères. Aucun service externe, dictionnaire complet ou LLM. Le serveur conserve son unique tentative et ses scores. `RoleReveal` réutilise seulement le rôle public d’un éliminé pendant élimination/devinette, et les cartes conservent ce rôle jusqu’au rejeu.
+
+Voir [le rapport V1.2](v1.2.md) pour les cas limites, les tests et la politique d’extension du validateur. L’infrastructure et le port HTTP 8080 sont inchangés.

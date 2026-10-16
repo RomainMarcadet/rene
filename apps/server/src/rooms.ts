@@ -1,6 +1,6 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import {
-  DEFAULT_SETTINGS, validComposition, canMoveInPhase, voteSeat, EMOTE_COOLDOWN_MS, emoteDuration, type AvatarAppearance, type ChatMessage,
+  DEFAULT_SETTINGS, validComposition, canMoveInPhase, voteSeat, EMOTE_COOLDOWN_MS, emoteDuration, type AvatarAppearance, type ChatMessage, type ChatReaction,
   type Command, type PublicPlayer, type RoomSettings, type RoomSnapshot, type PrivatePlayerState,
 } from '@rene/contracts';
 import { createGame, applyGameAction, chooseWordPair, publicGame, privateGame, type GameState } from '@rene/engine';
@@ -9,7 +9,7 @@ import type { Guest, Persistence } from './persistence.js';
 export interface Player extends PublicPlayer { joinedAt: number; disconnectedAt: number | null; lastMoveAt: number; lastChatAt: number; lastEmoteAt: number }
 export interface Room {
   code: string; sessionId: string; revision: number; hostId: string; settings: RoomSettings;
-  players: Map<string, Player>; game: GameState | null; chat: ChatMessage[]; usedWords: string[];
+  players: Map<string, Player>; game: GameState | null; chat: Omit<ChatMessage, 'reactions'>[]; chatReactions: Map<string, Map<string, ChatReaction>>; usedWords: string[];
   completedGames: number; voiceGeneration: number; scoredGames: Set<string>; lastOccupiedAt: number;
   persistencePending: boolean; resultRetryAt: number; scores: Map<string, number>; formerPlayers: Map<string, Player>;
 }
@@ -35,7 +35,7 @@ export class Rooms {
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code: string;
     do { code = Array.from({ length: 6 }, () => alphabet[randomInt(alphabet.length)]).join(''); } while (this.store.get(code));
-    const room: Room = { code, sessionId: randomUUID(), revision: 0, hostId: guest.id, settings: { ...DEFAULT_SETTINGS }, players: new Map(), game: null, chat: [], usedWords: [], completedGames: 0, voiceGeneration: 0, scoredGames: new Set(), lastOccupiedAt: now, persistencePending: false, resultRetryAt: 0, scores: new Map(), formerPlayers: new Map() };
+    const room: Room = { code, sessionId: randomUUID(), revision: 0, hostId: guest.id, settings: { ...DEFAULT_SETTINGS }, players: new Map(), game: null, chat: [], chatReactions: new Map(), usedWords: [], completedGames: 0, voiceGeneration: 0, scoredGames: new Set(), lastOccupiedAt: now, persistencePending: false, resultRetryAt: 0, scores: new Map(), formerPlayers: new Map() };
     this.store.set(code, room);
     this.join(room, guest, now);
     return room;
@@ -82,6 +82,10 @@ export class Rooms {
     room.hostId = next.id; room.revision++; return true;
   }
 
+  private requireCommunication(room: Room, player: Player) {
+    if (!editable(room) && (!room.game?.alive.includes(player.id) || player.waiting) && !room.settings.deadCanSpeak) throw new Error('Les spectateurs et les éliminés écoutent jusqu’à la fin de la partie.');
+  }
+
   async command(room: Room, id: string, command: Command, now: number) {
     const player = room.players.get(id);
     if (!player) throw new Error('Tu ne fais plus partie de ce salon.');
@@ -114,7 +118,7 @@ export class Rooms {
         room.usedWords.push(pair.id);
         // Keep a bounded history; choosing the pair handles exhaustion of the selected catalogue.
         if (room.usedWords.length > 1000) room.usedWords.splice(0, 500);
-        room.chat = [];
+        room.chat = []; room.chatReactions.clear();
         for (const p of players) { p.waiting = false; p.alive = true; p.ready = false; }
         room.voiceGeneration++;
         break;
@@ -123,13 +127,14 @@ export class Rooms {
         this.requireHost(room, id);
         if (room.game?.phase !== 'results') throw new Error('La partie n’est pas terminée.');
         if (room.persistencePending) throw new Error('Les résultats sont en cours de sauvegarde. Réessaie dans un instant.');
-        room.game = null; room.chat = []; room.formerPlayers.clear(); room.voiceGeneration++;
+        room.game = null; room.chat = []; room.chatReactions.clear(); room.formerPlayers.clear(); room.voiceGeneration++;
         if (room.completedGames >= room.settings.roundsPerSession) {
           room.sessionId = randomUUID(); room.completedGames = 0; room.scoredGames.clear(); room.scores.clear();
           for (const p of room.players.values()) p.score = 0;
         }
         for (const p of room.players.values()) { p.alive = true; p.waiting = false; p.ready = false; delete p.role; }
         break;
+      case 'game.setVoteReady': await this.gameAction(room, { type: 'setVoteReady', playerId: id, ready: command.ready }, now); break;
       case 'game.describe': await this.gameAction(room, { type: 'describe', playerId: id, text: command.text }, now); break;
       case 'game.vote': await this.gameAction(room, { type: 'vote', playerId: id, targetId: command.targetId }, now); break;
       case 'game.guess': await this.gameAction(room, { type: 'guess', playerId: id, word: command.word }, now); break;
@@ -137,12 +142,24 @@ export class Rooms {
         this.requireHost(room, id);
         if (!room.settings.hostCanSkipDiscussion) throw new Error('La discussion se termine au chronomètre.');
         await this.gameAction(room, { type: 'skipDiscussion' }, now); break;
+      case 'chat.react': {
+        this.requireCommunication(room, player);
+        if (!player.connected) throw new Error('Rejoins le salon pour réagir.');
+        if (!room.chat.some(message => message.id === command.messageId)) throw new Error('Ce message n’est plus dans le salon.');
+        const reactions = room.chatReactions.get(command.messageId) ?? new Map<string, ChatReaction>();
+        if ((reactions.get(id) ?? null) === command.reaction) return;
+        if (command.reaction === null) reactions.delete(id); else reactions.set(id, command.reaction);
+        if (reactions.size) room.chatReactions.set(command.messageId, reactions); else room.chatReactions.delete(command.messageId);
+        break;
+      }
       case 'chat.send':
-        if (!editable(room) && (!room.game?.alive.includes(id) || player.waiting) && !room.settings.deadCanSpeak) throw new Error('Les spectateurs et les éliminés écoutent jusqu’à la fin de la partie.');
+        this.requireCommunication(room, player);
         if (now - player.lastChatAt < 700) throw new Error('Un message à la fois !');
         player.lastChatAt = now;
         room.chat.push({ id: randomUUID(), playerId: id, name: player.name, text: command.text, at: now });
-        room.chat = room.chat.slice(-100); break;
+        room.chat = room.chat.slice(-100);
+        for (const messageId of room.chatReactions.keys()) if (!room.chat.some(message => message.id === messageId)) room.chatReactions.delete(messageId);
+        break;
       case 'player.emote':
         if (!editable(room) && !room.game?.alive.includes(id)) throw new Error('Les éliminés restent discrets pendant la partie.');
         if (now - player.lastEmoteAt < EMOTE_COOLDOWN_MS) throw new Error('Laisse ton avatar reprendre son souffle.');
@@ -232,11 +249,14 @@ export class Rooms {
         const role = room.game && (!alive || room.game.phase === 'results') && !p.waiting ? room.game.roles[p.id] : undefined;
         return { id: p.id, name: p.name, appearance: p.appearance, connected: p.connected, ready: p.ready, position: p.position, alive, waiting: p.waiting, score: p.score, ...(role ? { role } : {}), ...(p.emote && p.emote.until > now ? { emote: p.emote } : {}) };
       }),
-      game: room.game ? publicGame(room.game) : null, chat: room.chat, completedGames: room.completedGames,
+      game: room.game ? publicGame(room.game) : null, chat: room.chat.map(message => {
+        const reactions = [...(room.chatReactions.get(message.id)?.values() ?? [])];
+        return { ...message, reactions: { up: reactions.filter(value => value === 'up').length, down: reactions.filter(value => value === 'down').length } };
+      }), completedGames: room.completedGames,
       voiceGeneration: room.voiceGeneration, serverNow: now, resultsPending: room.persistencePending,
     };
   }
-  privateSnapshot(room: Room, playerId: string): PrivatePlayerState { return room.game ? privateGame(room.game, playerId) : { playerId, inGame: false, word: null, voteTarget: null }; }
+  privateSnapshot(room: Room, playerId: string): PrivatePlayerState { return { ...(room.game ? privateGame(room.game, playerId) : { playerId, inGame: false, word: null, voteTarget: null }), chatReactions: Object.fromEntries([...room.chatReactions].flatMap(([messageId, reactions]) => reactions.has(playerId) ? [[messageId, reactions.get(playerId)!]] : [])) }; }
   updateProfile(room: Room | undefined, id: string, name: string, appearance: AvatarAppearance) {
     if (!room) return;
     this.requireLobby(room);

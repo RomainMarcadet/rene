@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_APPEARANCE, DEFAULT_SETTINGS, EMOTE_DURATION_MS, emoteDuration, voteSeat, type Phase } from '@rene/contracts';
+import { CommandSchema, DEFAULT_APPEARANCE, DEFAULT_SETTINGS, EMOTE_DURATION_MS, emoteDuration, voteSeat, type Phase } from '@rene/contracts';
 import { createPersistence, type Guest } from './persistence.js';
 import { MemoryRoomStore, Rooms, type Room } from './rooms.js';
 import { SerialQueue } from './queue.js';
@@ -234,4 +234,115 @@ it('serializes mutations within a room but allows independent rooms and recovers
   await queue.run('b', () => { calls.push('b'); });
   expect(calls).toEqual(['a1', 'b']); release(); await first; await second; await queue.drain();
   expect(calls).toEqual(['a1', 'b', 'a2']);
+});
+
+
+describe('chat reactions', () => {
+  it('validates reaction commands without accepting an injected identity', () => {
+    for (const reaction of ['up', 'down', null]) expect(CommandSchema.safeParse({ type: 'chat.react', messageId: 'message', reaction }).success).toBe(true);
+    for (const payload of [{ reaction: 'sideways' }, { reaction: 'up', playerId: 'other' }, { reaction: 'up', messageId: '' }]) {
+      expect(CommandSchema.safeParse({ type: 'chat.react', messageId: 'message', ...payload }).success).toBe(false);
+    }
+  });
+  it('counts once per identity, replaces and cancels atomically, and keeps the local choice private', async () => {
+    const { rooms, room } = await fixture();
+    await rooms.command(room, 'p0', { type: 'chat.send', text: 'Je soupçonne René.' }, initialTime);
+    const id = room.chat[0].id;
+    const react = (playerId: string, reaction: 'up' | 'down' | null) => rooms.command(room, playerId, { type: 'chat.react', messageId: id, reaction }, initialTime + 1);
+    await Promise.all([react('p0', 'up'), react('p1', 'up'), react('p2', 'down')]);
+    const revision = room.revision;
+    await Promise.all(Array.from({ length: 10 }, () => react('p1', 'up')));
+    expect(room.revision).toBe(revision);
+    expect(rooms.snapshot(room, initialTime).chat[0].reactions).toEqual({ up: 2, down: 1 });
+    expect(rooms.privateSnapshot(room, 'p1').chatReactions).toEqual({ [id]: 'up' });
+    expect(rooms.privateSnapshot(room, 'p3').chatReactions).toEqual({});
+    expect(JSON.stringify(rooms.snapshot(room, initialTime).chat)).not.toContain('p1');
+    await react('p1', 'down'); await react('p2', null);
+    expect(rooms.snapshot(room, initialTime).chat[0].reactions).toEqual({ up: 1, down: 1 });
+    const projection = rooms.snapshot(room, initialTime); projection.chat[0].reactions.up = 99;
+    expect(rooms.snapshot(room, initialTime).chat[0].reactions.up).toBe(1);
+    expect([...room.players.values()].every(p => p.score === 0)).toBe(true);
+  });
+  it('enforces communication permissions, membership and message existence', async () => {
+    const { rooms, room } = await fixture(); await start(rooms, room);
+    await rooms.command(room, 'p0', { type: 'chat.send', text: 'Très suspect.' }, initialTime + 15);
+    const id = room.chat[0].id;
+    const react = (playerId: string, messageId = id) => rooms.command(room, playerId, { type: 'chat.react', messageId, reaction: 'up' }, initialTime + 20);
+    rooms.join(room, guest('late'), initialTime + 16);
+    await expect(react('late')).rejects.toThrow('écoutent');
+    await expect(react('stranger')).rejects.toThrow('partie de ce salon');
+    await expect(react('p0', 'missing')).rejects.toThrow('message');
+    room.game!.alive = room.game!.alive.filter(id => id !== 'p1');
+    await expect(react('p1')).rejects.toThrow('écoutent');
+    room.settings.deadCanSpeak = true;
+    await react('p1'); await react('late');
+    expect(rooms.snapshot(room, initialTime).chat[0].reactions.up).toBe(2);
+    rooms.disconnected(room, 'p1', initialTime + 25);
+    await expect(react('p1')).rejects.toThrow('Rejoins');
+  });
+  it('removes reactions with expired messages and with a new game', async () => {
+    const { rooms, room } = await fixture();
+    await rooms.command(room, 'p0', { type: 'chat.send', text: 'Ancien' }, initialTime);
+    const id = room.chat[0].id;
+    await rooms.command(room, 'p1', { type: 'chat.react', messageId: id, reaction: 'up' }, initialTime);
+    for (let i = 1; i <= 100; i++) await rooms.command(room, 'p0', { type: 'chat.send', text: `Message ${i}` }, initialTime + i * 701);
+    expect(room.chat).toHaveLength(100); expect(room.chatReactions.has(id)).toBe(false);
+    expect(rooms.privateSnapshot(room, 'p1').chatReactions).toEqual({});
+    await expect(rooms.command(room, 'p1', { type: 'chat.react', messageId: id, reaction: null }, initialTime + 80000)).rejects.toThrow('message');
+    await rooms.command(room, 'p1', { type: 'chat.react', messageId: room.chat[0].id, reaction: 'down' }, initialTime + 80001);
+    await start(rooms, room);
+    expect(room.chat).toHaveLength(0); expect(room.chatReactions.size).toBe(0);
+  });
+});
+
+
+describe('discussion readiness service', () => {
+  async function discussion(rooms: Rooms, room: Room) {
+    await start(rooms, room); let now = room.game!.deadline!;
+    await rooms.tick(room, now);
+    while (room.game!.phase === 'description') await rooms.command(room, room.game!.turnPlayerId!, { type: 'game.describe', text: 'Indice' }, ++now);
+    return now;
+  }
+  it('does not turn a disconnection into consent and retains a confirmation over reconnect', async () => {
+    const { rooms, room } = await fixture(); let now = await discussion(rooms, room);
+    await rooms.command(room, 'p0', { type: 'game.setVoteReady', ready: true }, ++now);
+    rooms.disconnected(room, 'p0', ++now); rooms.disconnected(room, 'p3', ++now);
+    for (const id of ['p1', 'p2']) await rooms.command(room, id, { type: 'game.setVoteReady', ready: true }, ++now);
+    expect(room.game!.phase).toBe('discussion'); expect(rooms.snapshot(room, now).game!.readyToVotePlayerIds).toEqual(['p0', 'p1', 'p2']);
+    rooms.connected(room, 'p0', ++now); rooms.connected(room, 'p3', ++now);
+    await rooms.command(room, 'p3', { type: 'game.setVoteReady', ready: true }, ++now);
+    expect(room.game!.phase).toBe('vote');
+    room.game!.alive.forEach((id, index, living) => expect(room.players.get(id)!.position).toEqual(voteSeat(index, living.length)));
+    await expect(rooms.command(room, 'p1', { type: 'game.setVoteReady', ready: false }, now + 1)).rejects.toThrow('discussion');
+  });
+  it('excludes waiting guests, handles departure unanimity, and keeps the timer as a fallback', async () => {
+    const { rooms, room } = await fixture(5); let now = await discussion(rooms, room);
+    rooms.join(room, guest('late'), ++now);
+    await expect(rooms.command(room, 'late', { type: 'game.setVoteReady', ready: true }, ++now)).rejects.toThrow('vivants');
+    const leaving = room.game!.alive.find(id => room.game!.roles[id] === 'civilian')!;
+    for (const id of room.game!.alive.filter(id => id !== leaving)) await rooms.command(room, id, { type: 'game.setVoteReady', ready: true }, ++now);
+    await rooms.leave(room, leaving, now + 1);
+    expect(room.game!.phase).toBe('vote'); expect(room.game!.readyToVotePlayerIds).not.toContain(leaving);
+    const other = await fixture(); await discussion(other.rooms, other.room);
+    await other.rooms.tick(other.room, other.room.game!.deadline!); expect(other.room.game!.phase).toBe('vote');
+  });
+});
+
+
+it('reveals only eliminated roles, including White before the guess, and resets on replay', async () => {
+  for (const role of ['civilian', 'undercover', 'white'] as const) {
+    const { rooms, room } = await fixture(6); await start(rooms, room);
+    const now = await votePhase(rooms, room); const target = room.game!.alive.find(id => room.game!.roles[id] === role)!;
+    await eliminate(rooms, room, target, now);
+    let projection = rooms.snapshot(room, now + 20);
+    expect(projection.players.find(p => p.id === target)).toMatchObject({ alive: false, role });
+    expect(projection.players.filter(p => p.alive).every(p => p.role === undefined)).toBe(true);
+    const living = room.game!.alive[0]; rooms.disconnected(room, living, now + 21);
+    expect(rooms.snapshot(room, now + 21).players.find(p => p.id === living)).toMatchObject({ connected: false, alive: true });
+    expect(rooms.snapshot(room, now + 21).players.find(p => p.id === living)!.role).toBeUndefined();
+    if (role === 'white') expect(room.game!.phase).toBe('whiteGuess');
+    else { await rooms.tick(room, room.game!.deadline!); projection = rooms.snapshot(room, now + 25); expect(projection.players.find(p => p.id === target)!.role).toBe(role); }
+    room.game!.phase = 'results'; await rooms.command(room, room.hostId, { type: 'game.next' }, now + 30);
+    expect(rooms.snapshot(room, now + 30).players.every(p => p.role === undefined && p.alive)).toBe(true);
+  }
 });

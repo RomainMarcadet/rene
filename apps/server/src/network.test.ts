@@ -148,6 +148,64 @@ describe('real Socket.IO clients', () => {
     expect(Number.isFinite(room.players.get(moving.playerId)!.position.x)).toBe(true);
   });
 
+  it('synchronizes simultaneous reactions, rejects invalid payloads and restores the local choice on reconnect', async () => {
+    const { running, url, actors, room } = await opened();
+    expect((await send(actors[0], { type: 'chat.send', text: 'René est très louche.' })).ok).toBe(true);
+    const id = room.chat[0].id;
+    const react = (index: number, reaction: 'up' | 'down' | null) => send(actors[index], { type: 'chat.react', messageId: id, reaction });
+    expect((await Promise.all([react(0, 'up'), react(1, 'up'), react(2, 'down')])).every(ack => ack.ok)).toBe(true);
+    await expect.poll(() => actors.map(a => a.snapshot?.chat[0].reactions)).toEqual(Array(4).fill({ up: 2, down: 1 }));
+    const revision = room.revision;
+    await react(1, 'up'); expect(room.revision).toBe(revision);
+    await react(1, 'down'); await react(0, null);
+    await expect.poll(() => actors.every(a => a.snapshot?.chat[0].reactions.down === 2)).toBe(true);
+    const old = actors[1]; old.socket.disconnect();
+    actors[1] = await actor(running, url, old); await send(actors[1], { type: 'room.resume' });
+    await expect.poll(() => actors[1].secret?.chatReactions[id]).toBe('down');
+    expect((await send(actors[0], { type: 'chat.react', messageId: 'absent', reaction: 'up' })).ok).toBe(false);
+    expect((await send(actors[0], { type: 'chat.react', messageId: id, reaction: 'invalid' } as unknown as Command)).ok).toBe(false);
+    expect(actors.every(a => a.snapshot?.players.every(p => p.score === 0))).toBe(true);
+  });
+
+  it('serializes the final readiness confirmations and seats voters exactly once', async () => {
+    const { running, actors, room } = await opened();
+    for (const a of actors) await send(a, { type: 'player.ready', ready: true });
+    await send(actors[0], { type: 'game.start' }); await expire(running, room, actors[0]);
+    while (room.game!.phase === 'description') await send(actors.find(a => a.playerId === room.game!.turnPlayerId)!, { type: 'game.describe', text: 'Indice' }, { phaseId: room.game!.phaseId });
+    const phaseId = room.game!.phaseId; const revision = room.game!.revision;
+    for (const index of [0, 1]) expect((await send(actors[index], { type: 'game.setVoteReady', ready: true }, { phaseId })).ok).toBe(true);
+    await expect.poll(() => actors.every(a => a.snapshot?.game?.readyToVotePlayerIds.length === 2)).toBe(true);
+    const last = await Promise.all([2, 3].map(index => send(actors[index], { type: 'game.setVoteReady', ready: true }, { phaseId })));
+    expect(last.every(ack => ack.ok)).toBe(true);
+    await expect.poll(() => actors.every(a => a.snapshot?.game?.phase === 'vote')).toBe(true);
+    expect(room.game!.revision).toBe(revision + 1);
+    expect((await send(actors[2], { type: 'game.setVoteReady', ready: false }, { phaseId })).ok).toBe(false);
+    expect(room.game!.ballots).toEqual({});
+    expect(actors.every(a => a.snapshot?.players.every(p => !p.role))).toBe(true);
+  });
+
+  it('reveals White to all clients, accepts balais for balai and rejects a second guess', async () => {
+    const { running, actors, room } = await opened();
+    room.settings = { ...room.settings, automaticRoles: false, undercoverCount: 0, whiteCount: 1 };
+    for (const a of actors) await send(a, { type: 'player.ready', ready: true });
+    await send(actors[0], { type: 'game.start' });
+    room.game!.words.civilian = 'Balai'; // controlled server fixture; no production override/API
+    await expire(running, room, actors[0]);
+    while (room.game!.phase === 'description') await send(actors.find(a => a.playerId === room.game!.turnPlayerId)!, { type: 'game.describe', text: 'Indice' }, { phaseId: room.game!.phaseId });
+    for (const a of actors) await send(a, { type: 'game.setVoteReady', ready: true }, { phaseId: room.game!.phaseId });
+    const white = actors.find(a => room.game!.roles[a.playerId] === 'white')!;
+    for (const a of actors) await send(a, { type: 'game.vote', targetId: a === white ? actors.find(other => other !== white)!.playerId : white.playerId }, { phaseId: room.game!.phaseId });
+    await expect.poll(() => actors.every(a => a.snapshot?.game?.phase === 'whiteGuess')).toBe(true);
+    expect(actors.every(a => a.snapshot!.players.find(p => p.id === white.playerId)?.role === 'white')).toBe(true);
+    expect(actors.every(a => a.snapshot!.players.filter(p => p.alive).every(p => !p.role))).toBe(true);
+    expect(actors.every(a => !JSON.stringify(a.snapshot).includes('Balai'))).toBe(true);
+    const phaseId = room.game!.phaseId;
+    expect((await send(white, { type: 'game.guess', word: 'balais' }, { phaseId })).ok).toBe(true);
+    await expect.poll(() => actors.every(a => a.snapshot?.game?.result?.winner === 'white')).toBe(true);
+    expect(actors.every(a => a.snapshot!.players.find(p => p.id === white.playerId)?.score === 6)).toBe(true);
+    expect((await send(white, { type: 'game.guess', word: 'balai' }, { phaseId })).ok).toBe(false);
+  });
+
   it('recovers the same place after refresh and replaces a second controlling connection', async () => {
     const { running, url, actors, room } = await opened();
     for (const a of actors) await send(a, { type: 'player.ready', ready: true });

@@ -2,6 +2,8 @@
 
 Les suites réseau et navigateur sont écrites pour exercer des clients indépendants ; elles ne remplacent pas la partie finale avec quatre personnes sur différents appareils et réseaux. Leur présence ne signifie pas qu'elles ont été exécutées : les preuves effectives figurent ci-dessous.
 
+**V1.2 — 16 octobre 2026 :** [diagnostic, règles et preuves de validation](v1.2.md) pour les réactions, l’unanimité des vivants, la tolérance de Mr. White et les révélations de rôles. Les régressions V1.1 et les vérifications humaines restantes y sont distinguées.
+
 **V1.1 — 15 octobre 2026 :** consulter [le diagnostic et les preuves de régression](v1.1.md) pour les tours/éliminations, l’historique, les règles illustrées, le push-to-talk, la séparation micro/écoute, les mouvements pendant la partie et les emotes. Ce compte rendu distingue les tests LiveKit locaux et la recette humaine restante. Les paragraphes V1 ci-dessous conservent leur valeur historique.
 
 ## Chaîne automatisée
