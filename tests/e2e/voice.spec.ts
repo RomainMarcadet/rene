@@ -1,4 +1,5 @@
 import { test, expect, type Browser, type Page } from '@playwright/test';
+import { setMicrophoneMode, showPanel, voiceSettings } from './helpers';
 
 test.skip(process.env.RENE_VOICE_E2E !== '1', 'Requires the local LiveKit service (RENE_VOICE_E2E=1).');
 test.use({ launchOptions: { args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'] } });
@@ -35,7 +36,7 @@ async function received(page: Page) {
 test('muting the microphone keeps a subscribed, playing remote audio track', async ({ browser, baseURL }) => {
   const { contexts, pages } = await pair(browser, baseURL!);
   try {
-    for (const page of pages) { await page.getByLabel('Mode du microphone').selectOption('open'); await page.getByRole('button', { name: 'Ouvrir mon microphone', exact: true }).click(); }
+    for (const page of pages) { await setMicrophoneMode(page, 'open'); await page.getByRole('button', { name: 'Ouvrir mon microphone', exact: true }).click(); }
     await expect.poll(() => received(pages[0])).toBeGreaterThan(0);
     await pages[0].getByRole('button', { name: 'Couper mon microphone', exact: true }).click();
     await expect(pages[0].locator('.microphone-state')).toContainText('Microphone : coupé');
@@ -65,6 +66,42 @@ test('a stale voice generation is retried instead of leaving the listener discon
   expect(requests).toBeGreaterThan(1);
 });
 
+test('expanding, folding and resizing keeps LiveKit, listening and the draft alive', async ({ browser, baseURL }) => {
+  test.setTimeout(90000);
+  const { contexts, pages } = await pair(browser, baseURL!); const page = pages[0];
+  try {
+    await setMicrophoneMode(pages[1], 'open');
+    await pages[1].getByRole('button', { name: 'Ouvrir mon microphone', exact: true }).click();
+    await expect.poll(() => received(page)).toBeGreaterThan(1000);
+    await page.getByLabel('Message au salon').fill('Un brouillon à voix basse.');
+    const peers = () => page.evaluate(() => (window as unknown as { __voicePeers: RTCPeerConnection[] }).__voicePeers.length);
+    const connections = await peers(); const bytes = await received(page);
+    await page.getByRole('button', { name: 'Agrandir la discussion' }).click();
+    await page.screenshot({ path: 'output/playwright/v1.3-voice-expanded.png' });
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Agrandir la discussion' }).click();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.locator('.layout-mobile')).toBeVisible();
+    await expect(page.locator('.communication-zone.expanded')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByLabel('Message au salon')).toBeHidden();
+    await expect(page.getByRole('navigation', { name: 'Panneaux du salon' }).getByRole('button', { name: /^Discussion/ })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Écoute : activée', exact: true })).toBeVisible();
+    await showPanel(page, 'Discussion');
+    await page.getByRole('button', { name: 'Agrandir la discussion' }).click();
+    await page.keyboard.press('Escape');
+    await expect(page.getByLabel('Message au salon')).toHaveValue('Un brouillon à voix basse.');
+    await page.getByRole('navigation', { name: 'Panneaux du salon' }).getByRole('button', { name: /^Discussion/ }).click();
+    await page.setViewportSize({ width: 1366, height: 768 });
+    expect(await peers()).toBe(connections);
+    await expect.poll(() => received(page)).toBeGreaterThan(bytes + 1000);
+    await expect(page.locator('.microphone-state')).toContainText('coupé');
+    await page.getByLabel('Message au salon').blur();
+    await page.keyboard.down('v'); await expect(page.locator('.microphone-state')).toContainText('transmission');
+    await page.keyboard.up('v'); await expect(page.locator('.microphone-state')).toContainText('coupé');
+  } finally { await Promise.all(contexts.map(c => c.close())); }
+});
+
 
 test('push-to-talk releases on keyup, blur, typing, mode changes and reconnect', async ({ browser, baseURL }) => {
   const { contexts, pages } = await pair(browser, baseURL!);
@@ -80,12 +117,12 @@ test('push-to-talk releases on keyup, blur, typing, mode changes and reconnect',
     const input = page.getByRole('textbox', { name: /message/i });
     await input.focus(); await page.keyboard.down('v'); await expect(state).toContainText('coupé'); await page.keyboard.up('v');
     await input.blur();
-    await page.getByLabel('Mode du microphone').selectOption('open');
+    await setMicrophoneMode(page, 'open');
     await page.getByRole('button', { name: 'Ouvrir mon microphone', exact: true }).click(); await expect(state).toContainText('transmission');
     await page.getByRole('button', { name: 'Écoute : activée', exact: true }).click(); await expect(state).toContainText('transmission');
     await page.keyboard.press('v'); await expect(state).toContainText('transmission');
-    await page.getByLabel('Mode du microphone').selectOption('ptt'); await expect(state).toContainText('coupé');
-    await page.getByRole('button', { name: 'Quitter le vocal', exact: true }).click();
+    await setMicrophoneMode(page, 'ptt'); await expect(state).toContainText('coupé');
+    await voiceSettings(page); await page.getByRole('button', { name: 'Quitter le vocal', exact: true }).click();
     await page.getByRole('button', { name: /Rejoindre le vocal/ }).click();
     await expect(page.locator('.voice-panel')).toContainText('Dans la conversation');
     await expect(state).toContainText('coupé');
@@ -155,11 +192,11 @@ test('eliminated players keep receiving audio after the server rotates voice per
     await expect(pages[1].locator('.microphone-state')).toContainText('Écoute seule');
     await expect(pages[1].getByRole('button', { name: 'Maintenir pour parler · V', exact: true })).toBeDisabled();
     await expect(pages[1].locator('.voice-panel')).toContainText('À l’écoute des vivants', { timeout: 15000 });
-    await pages[0].getByLabel('Mode du microphone').selectOption('open');
+    await setMicrophoneMode(pages[0], 'open');
     await expect(pages[0].getByRole('button', { name: 'Ouvrir mon microphone', exact: true })).toBeEnabled();
     await pages[0].getByRole('button', { name: 'Ouvrir mon microphone', exact: true }).click();
     await expect.poll(() => received(pages[1])).toBeGreaterThan(0);
-    await pages[1].getByRole('button', { name: 'Quitter le vocal', exact: true }).click();
+    await voiceSettings(pages[1]); await pages[1].getByRole('button', { name: 'Quitter le vocal', exact: true }).click();
     await pages[1].getByRole('button', { name: /Rejoindre le vocal/ }).click();
     await expect(pages[1].locator('.voice-panel')).toContainText('À l’écoute des vivants');
     await expect(pages[1].getByRole('button', { name: 'Maintenir pour parler · V', exact: true })).toBeDisabled();

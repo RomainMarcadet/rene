@@ -75,6 +75,8 @@ Le résultat des tests locaux et les vérifications restant à réaliser sont d�
 
 La V1.2 ajoute les réactions de chat, le passage au vote à l’unanimité et les rôles éliminés persistants. La devinette de Mr. White accepte accents, pluriels connus et certaines petites fautes répertoriées (`balais`/`balaai` pour `balai`), avec une seule tentative. Le validateur reste conservateur : les synonymes et mots seulement ressemblants sont refusés. Les choix, limites et résultats figurent dans [le rapport V1.2](docs/v1.2.md).
 
+La V1.3 fait du hub une scène plein écran, avec les panneaux de jeu superposés, un tiroir mobile Suspects / Indices / Discussion et une communication qui reste connectée pendant les replis et agrandissements. Le bouton « Sons » commande les effets du jeu ; l'écoute et le microphone se règlent dans le panneau de communication. Voir [le rapport, les captures et la recette V1.3](docs/v1.3.md).
+
 Les validations de la V1.1, le diagnostic audio et les limites de la recette sont détaillés dans [le compte rendu V1.1](docs/v1.1.md). La recette automatisée emploie des clients indépendants et des données serveur réelles ; l’écoute humaine, Safari/mobile physique et les réseaux distants restent à valider sur l’hébergement cible.
 
 L'image Docker sur le **port 8080** a également été compilée et testée dans une pile isolée avec PostgreSQL et Caddy 2.11.4 : migrations, frontend/API en HTTPS, quatre clients Socket.IO (polling et WebSocket), chat et cookies invités sont validés. Les certificats de cette recette sont internes ; le vocal reste à vérifier sur le serveur réel. Voir [les preuves de cette recette Docker/Caddy](docs/acceptance.md).
