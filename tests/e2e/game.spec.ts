@@ -83,7 +83,7 @@ test('four independent browsers finish a game, reconnect and prepare a replay', 
       for (const page of pages) {
         const card = page.locator('.participants li.eliminated').filter({ hasText: names[target] });
         await expect(card).toContainText('ÉLIMINÉ');
-        await expect(card).toHaveCSS('background-color', 'rgb(243, 69, 49)');
+        await expect(card.locator('.elimination-tag')).toHaveCSS('background-color', 'rgb(243, 69, 49)');
         await expect(card.getByRole('img', { name: 'Portrait éliminé · yeux rouges' })).toBeVisible();
       }
       await expect(pages[0].locator('.phase-results, .phase-description')).toBeVisible({ timeout: 6000 });

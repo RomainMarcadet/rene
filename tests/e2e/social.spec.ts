@@ -123,7 +123,10 @@ test('four clients react, unanimously start voting and reveal White before a tol
       await expect(page.locator('.role-reveal')).toContainText('C’ÉTAIT MR. WHITE !');
       const card = page.locator('.participants .eliminated');
       await expect(card).toContainText(names[white]); await expect(card).toContainText('ÉLIMINÉ'); await expect(card).toContainText('MR. WHITE');
-      await expect(card).toHaveCSS('background-color', 'rgb(243, 69, 49)');
+      await expect(card.locator('.elimination-tag')).toHaveCSS('background-color', 'rgb(243, 69, 49)');
+      const mark = (await state(page)).room.game.playerMarks[vote.players[white].id];
+      await expect(card.locator(`.player-identity[data-player-mark="${mark}"]`)).toHaveCount(1);
+      expect(await card.evaluate(node => getComputedStyle(node).borderLeftColor)).toBe(await card.locator('.player-token').evaluate(node => getComputedStyle(node).backgroundColor));
       await expect(page.locator('.participants li:not(.eliminated) .revealed-role')).toHaveCount(0);
     }));
     await expect(up(pages[white])).toBeDisabled();
