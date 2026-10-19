@@ -18,7 +18,7 @@ function Camera({ room, playerId, clearArea, compact, reduced }: { room: RoomSna
     const focus = room.players.find(p => p.id === (room.game?.phase === 'description' ? room.game.turnPlayerId : playerId));
     const amount = compact ? 1 : .15;
     const { right, up, target, position } = vectors.current;
-    target.set(vote ? 0 : (focus?.position.x ?? 0) * amount, compact ? .4 : 1.25, vote ? 0 : (focus?.position.z ?? 0) * amount);
+    target.set(vote ? 0 : (focus?.position.x ?? 0) * amount, compact ? .4 : 2.1, vote ? 0 : (focus?.position.z ?? 0) * amount);
     // Keep silhouettes readable when the clue grid grows; the floor may extend behind HUD panels.
     const zoom = Math.max(compact ? 10 : 30, Math.min(70, clearArea.width / (compact ? 10 : 18), clearArea.height / (compact ? 8 : 9)));
     right.setFromMatrixColumn(cam.matrixWorld, 0); up.setFromMatrixColumn(cam.matrixWorld, 1);
