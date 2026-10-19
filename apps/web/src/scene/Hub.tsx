@@ -18,8 +18,9 @@ function Camera({ room, playerId, clearArea, compact, reduced }: { room: RoomSna
     const focus = room.players.find(p => p.id === (room.game?.phase === 'description' ? room.game.turnPlayerId : playerId));
     const amount = compact ? 1 : .15;
     const { right, up, target, position } = vectors.current;
-    target.set(vote ? 0 : (focus?.position.x ?? 0) * amount, .4, vote ? 0 : (focus?.position.z ?? 0) * amount);
-    const zoom = Math.max(10, Math.min(70, clearArea.width / (compact ? 10 : 18), clearArea.height / (compact ? 8 : 12)));
+    target.set(vote ? 0 : (focus?.position.x ?? 0) * amount, compact ? .4 : 1.25, vote ? 0 : (focus?.position.z ?? 0) * amount);
+    // Keep silhouettes readable when the clue grid grows; the floor may extend behind HUD panels.
+    const zoom = Math.max(compact ? 10 : 30, Math.min(70, clearArea.width / (compact ? 10 : 18), clearArea.height / (compact ? 8 : 9)));
     right.setFromMatrixColumn(cam.matrixWorld, 0); up.setFromMatrixColumn(cam.matrixWorld, 1);
     // Translate parallel to the image plane: retain the original orthographic angle.
     target.addScaledVector(right, (size.width / 2 - clearArea.left - clearArea.width / 2) / zoom);
@@ -47,6 +48,6 @@ export default function Hub({ room, playerId, speaking, clearArea, compact, cont
   const me = room.players.find(p => p.id === playerId);
   return <><div className="hub-canvas"><Canvas orthographic camera={{ position: [11, 13, 17], zoom: 27, near: .1, far: 100 }} dpr={[1, 1.5]} gl={{ antialias: true, alpha: false, powerPreference: 'low-power' }} fallback={<div className="scene-fallback">La 3D est indisponible. La partie reste accessible dans les panneaux.</div>}><Salon /><Camera room={room} playerId={playerId} clearArea={clearArea} compact={compact} reduced={reduced} />{room.players.map(p => {
     const selectable = vote && !voteTarget && me?.alive && !me.waiting && p.id !== playerId && room.game!.voteCandidates.includes(p.id);
-    return <Avatar key={p.id} appearance={p.appearance} name={p.name} position={[p.position.x, 0, p.position.z]} yaw={p.position.yaw} seated={vote} selected={p.id === playerId || p.id === room.game?.turnPlayerId} speaking={speaking.includes(p.id)} dead={!p.alive && !p.waiting} winner={room.game?.phase === 'results' && room.game.result?.winnerIds.includes(p.id)} emote={p.emote?.kind} emoteUntil={p.emote ? p.emote.until - offset : undefined} onClick={selectable ? () => void send({ type: 'game.vote', targetId: p.id }) : undefined} reducedMotion={reduced} />;
+    return <Avatar key={p.id} appearance={p.appearance} name={p.name} mark={room.game?.playerMarks[p.id]} position={[p.position.x, 0, p.position.z]} yaw={p.position.yaw} seated={vote} selected={p.id === playerId || p.id === room.game?.turnPlayerId} speaking={speaking.includes(p.id)} dead={!p.alive && !p.waiting} winner={room.game?.phase === 'results' && room.game.result?.winnerIds.includes(p.id)} emote={p.emote?.kind} emoteUntil={p.emote ? p.emote.until - offset : undefined} onClick={selectable ? () => void send({ type: 'game.vote', targetId: p.id }) : undefined} reducedMotion={reduced} />;
   })}</Canvas></div>{freeMovement && controlsVisible && <div className="touch-pad" aria-label="Déplacements tactiles">{([{ name: 'Haut', x: 0, z: -1, icon: '↑' }, { name: 'Gauche', x: -1, z: 0, icon: '←' }, { name: 'Bas', x: 0, z: 1, icon: '↓' }, { name: 'Droite', x: 1, z: 0, icon: '→' }]).map(direction => <button key={direction.name} className={`touch-${direction.name.toLowerCase()}`} aria-label={`Se déplacer : ${direction.name}`} onPointerDown={event => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); touch.current = direction; }} onPointerUp={() => { touch.current = { x: 0, z: 0 }; }} onPointerCancel={() => { touch.current = { x: 0, z: 0 }; }} onLostPointerCapture={() => { touch.current = { x: 0, z: 0 }; }}>{direction.icon}</button>)}</div>}</>;
 }
