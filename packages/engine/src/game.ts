@@ -63,11 +63,17 @@ export function createGame(input: {
   const assignedPlayers = shuffled(playerIds, random);
   const roles = Object.fromEntries(assignedPlayers.map((playerId, i) => [playerId, assignedRoles[i]]));
   const invert = randomIndex(2, random) === 1;
+  const order = shuffled(playerIds, random);
+  const eligible = order.filter(id => roles[id] !== 'white');
+  // Uniform eligible opener; rotate the shuffled circle rather than sorting by role.
+  const first = eligible.length ? eligible[randomIndex(eligible.length, random)] : order[0];
+  const start = order.indexOf(first);
   return {
     id, playerIds: [...playerIds], roles, alive: [...playerIds], departed: [],
+    playerMarks: Object.fromEntries(playerIds.map((playerId, slot) => [playerId, slot])),
     words: { civilian: invert ? pair.b : pair.a, undercover: invert ? pair.a : pair.b }, settings,
     phase: 'reveal', phaseId: `${id}:0`, revision: 0, round: 1, deadline: now + 8_000,
-    turnPlayerId: null, order: shuffled(playerIds, random), descriptions: [],
+    turnPlayerId: null, order: [...order.slice(start), ...order.slice(0, start)], descriptions: [],
     readyToVotePlayerIds: [], ballots: {}, voteCandidates: [], voteCounts: null, votedPlayerIds: [],
     eliminatedPlayerId: null, whitePlayerId: null, result: null,
   };
@@ -105,6 +111,12 @@ function finishIfWon(game: GameState, now: number): boolean {
 
 function nextDescription(game: GameState, now: number) {
   const spoken = new Set(game.descriptions.filter(item => item.round === game.round).map(item => item.playerId));
+  if (game.round === 1 && spoken.size === 0) {
+    // A departure before the first contribution must not promote a White to opener.
+    const first = game.order.findIndex(id => game.alive.includes(id) && game.roles[id] !== 'white');
+    if (first > 0) game.order = [...game.order.slice(first), ...game.order.slice(0, first)];
+    // No eligible survivor: keep the remaining circle; never stall on an empty pool.
+  }
   const next = game.order.find(id => game.alive.includes(id) && !spoken.has(id));
   if (next) {
     enter(game, 'description', now, game.settings.descriptionSeconds);
@@ -272,6 +284,7 @@ function publicResult(result: GameResult | null): GameResult | null {
 export function publicGame(game: GameState): PublicGame {
   return {
     id: game.id, phase: game.phase, phaseId: game.phaseId, round: game.round, deadline: game.deadline,
+    playerMarks: { ...game.playerMarks },
     turnPlayerId: game.turnPlayerId, order: [...game.order], descriptions: game.descriptions.map(description => ({ ...description })),
     voteCandidates: [...game.voteCandidates], voteCounts: game.voteCounts ? { ...game.voteCounts } : null,
     readyToVotePlayerIds: [...game.readyToVotePlayerIds], votedPlayerIds: [...game.votedPlayerIds], eliminatedPlayerId: game.eliminatedPlayerId,

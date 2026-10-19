@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { AppearanceSchema, type AvatarAppearance } from './appearance.js';
 export * from './appearance.js';
+export * from './playerMarks.js';
 export const SettingsSchema = z.object({
   automaticRoles: z.boolean(), undercoverCount: z.number().int().min(0).max(10), whiteCount: z.number().int().min(0).max(10),
   descriptionSeconds: z.number().int().min(10).max(180), discussionSeconds: z.number().int().min(15).max(600),
@@ -30,6 +31,7 @@ export interface Description { playerId: string; text: string; round: number; ti
 export interface GameResult { winner: Winner; winnerIds: string[]; civilWord: string; undercoverWord: string; roles: Record<string, Role>; points: Record<string, number> }
 export interface PublicGame {
   id: string; phase: Phase; phaseId: string; round: number; deadline: number | null; turnPlayerId: string | null;
+  playerMarks: Record<string, number>;
   order: string[]; descriptions: Description[]; voteCandidates: string[]; voteCounts: Record<string, number> | null;
   readyToVotePlayerIds: string[]; votedPlayerIds: string[]; eliminatedPlayerId: string | null; whitePlayerId: string | null; result: GameResult | null;
 }
