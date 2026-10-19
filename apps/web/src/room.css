@@ -80,30 +80,42 @@
 .room-page .participant-info strong { font-size: 11px; }
 .room-page .participant-info span { font-size: 8px; }
 .room-page .mute-button { min-width: 30px; min-height: 36px; }
-.room-page .clues-zone { grid-area: 1 / 2 / 3 / 3; align-self: end; width: 100%; max-width: 900px; justify-self: center; border: var(--line); border-radius: 12px; background: #fffdf8f5; box-shadow: 4px 4px var(--ink); }
+.room-page .clues-zone { grid-area: 1 / 2 / 3 / 3; align-self: end; width: 100%; max-width: 900px; justify-self: center; border: var(--line); border-radius: 12px; background: #fffdf8f5; box-shadow: 4px 4px var(--ink); container: clue-board / inline-size; }
 .room-page .description-history { margin: 0; padding: 14px; border: 0; display: flex; flex-direction: column; max-height: inherit; }
 .room-page .description-history .panel-label { flex-shrink: 0; }
 .room-page .description-history .eyebrow { font-size: 7px; }
 .room-page .description-history .history-rounds { min-width: 0; max-height: none; overflow: visible; }
 .room-page .history-rounds h3 { background: none; margin: 0 0 8px; padding: 0; font-size: 9px; letter-spacing: 1px; }
 .room-page .description-history .history-rounds ol { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, max(145px, calc((100% - 24px) / 4))), 1fr)); gap: 8px; padding: 0; margin: 0; }
-.room-page .description-history .history-rounds li { display: flex; flex-direction: column; min-width: 0; border: 1.5px solid var(--ink); border-radius: 7px; padding: 9px; gap: 7px; background: #f5edb4; font-size: 12px; line-height: 1.4; }
-.room-page .description-history .current-round ol { grid-auto-rows: minmax(132px, auto); }
-.room-page .description-history .current-round li { padding: 7px; gap: 5px; line-height: 1.3; }
-.room-page .description-history .current-round .clue-author>.portrait { display: none; }
-.room-page .clue-author { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.room-page .clue-author .portrait { width: 29px; height: 34px; flex-shrink: 0; }
-.room-page .clue-author strong { font-size: 11px; min-width: 0; flex: 1; }
-.room-page .clue-turn { font-size: 18px; font-weight: 900; }
+.room-page .description-history .history-rounds li { display: flex; flex-direction: column; min-width: 0; border: 2px solid var(--ink); border-radius: 9px 6px 9px 6px; padding: 6px; gap: 4px; background: var(--player-color, var(--cream)); color: var(--player-foreground, var(--ink)); }
+.room-page .description-history .current-round ol { grid-auto-rows: minmax(144px, auto); }
+.room-page .description-history.clues-six .current-round ol { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.room-page:not(.layout-mobile) .description-history.clues-six .current-round ol { grid-auto-rows: minmax(116px, auto); }
+/* Text flows around the head, then uses the full card width for longer clues. */
+.room-page .clue-content { display: flow-root; flex: 1; min-width: 0; }
+.room-page .clue-portrait { position: relative; float: left; width: 42px; height: 48px; margin: 0 6px 3px 0; padding: 2px; border: 1.5px solid var(--ink); border-radius: 8px 5px 8px 5px; background: var(--cream); transform: rotate(-3deg); }
+.room-page .clue-portrait>.portrait { display: block; width: 100%; height: 100%; padding: 0; }
+.room-page .clue-portrait>.neutral-portrait { height: 100%; }
+.room-page .clue-text { margin: 0; font-size: 14px; line-height: 1.2; font-weight: 800; overflow-wrap: anywhere; }
+.room-page .clue-author { display: flex; align-items: center; min-width: 0; padding-top: 3px; border-top: 1px solid currentColor; }
+.room-page .clue-author strong { display: flex; font-size: 11px; min-width: 0; font-weight: 600; }
+.room-page .clue-author .has-player-mark .player-name { color: inherit; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.room-page .clue-author .player-token { width: 17px; height: 17px; flex-basis: 17px; font-size: 10px; background: var(--cream); color: var(--ink); }
+.room-page .clue-turn { position: absolute; right: -5px; bottom: -5px; display: grid; place-items: center; width: 23px; height: 23px; border: 1.5px solid var(--ink); border-radius: 50%; background: var(--cream); color: var(--ink); font-size: 18px; font-weight: 900; line-height: 1; }
 .room-page .previous-rounds { margin-top: 8px; }
 .room-page .previous-rounds { max-height: 55dvh; overflow: auto; overscroll-behavior: contain; }
 .room-page .previous-rounds section+section { margin-top: 12px; }
-.room-page .description-history li>span { overflow-wrap: anywhere; font-style: italic; }
-.room-page .description-history .history-rounds li.clue-pending { background: var(--cream); color: #686059; border-style: dashed; }
-.room-page .description-history .history-rounds li.clue-active { background: var(--pink); color: var(--ink); border-style: solid; }
-.room-page .description-history .history-rounds li.clue-expired { background: #e8e1d8; }
+.room-page .description-history .history-rounds li.clue-pending { border-style: dashed; }
+.room-page .clue-pending .clue-text, .room-page .clue-expired .clue-text { font-size: 13px; font-weight: 500; }
+.room-page .description-history .history-rounds li.clue-active { border-style: solid; box-shadow: 2px 2px var(--ink); }
+.room-page .clue-active .clue-text { font-weight: 800; }
 .room-page .history-rounds summary { padding: 8px 0; font-size: 10px; }
 .room-page .clues-empty { font-size: 11px; margin: 0; color: #686059; }
+@container clue-board (max-width: 700px) {
+  .room-page .clue-text { font-size: 12px; }
+  .room-page .clue-portrait { width: 36px; height: 42px; }
+  .room-page .clue-author strong { font-size: 10px; }
+}
 .room-page .communication-zone { grid-area: 2 / 3; display: flex; flex-direction: column; border: var(--line); border-radius: 12px; background: var(--cream); box-shadow: 4px 4px var(--ink); }
 .room-page .communication-zone.expanded { grid-area: auto; position: absolute; right: 0; bottom: 0; width: min(760px, 100%); height: min(680px, 100%); z-index: 30; pointer-events: auto; }
 .room-page .chat-panel { flex: 1; display: flex; flex-direction: column; min-height: 100px; width: 100%; border: 0; border-radius: 10px 10px 0 0; }
@@ -144,7 +156,16 @@
 .player-token { display: inline-grid; place-items: center; flex: 0 0 20px; width: 20px; height: 20px; border: 1px solid var(--ink); border-radius: 5px; background: var(--player-color); color: var(--player-foreground); font-family: inherit; font-size: 11px; font-weight: 900; line-height: 1; }
 .room-page .participant-info strong span { font-size: inherit; line-height: 1.3; }
 .room-page .participant-info .player-token { color: var(--player-foreground); }
+.room-page .participants li:has(.has-player-mark) { border-left: 4px solid var(--player-color); }
+.room-page .participants li.eliminated { background: #fffdf8; }
+.room-page .participants li.eliminated .player-name { color: var(--player-ink); }
+.room-page .participants li.eliminated .player-token { color: var(--player-foreground); }
+.room-page .elimination-tag { display: inline-block; padding: 1px 3px; border: 1px solid var(--ink); border-radius: 3px; background: var(--red); color: var(--ink); font-size: inherit; }
 .avatar-name .player-token { width: 18px; height: 18px; flex-basis: 18px; font-size: 10px; }
+.room-page .avatar-name:has(.has-player-mark) { display: flex; align-items: center; gap: 3px; padding: 2px; background: var(--cream); }
+.room-page .avatar-name>.has-player-mark { padding: 3px 5px; border-radius: 2px; background: var(--player-color); color: var(--player-foreground); }
+.room-page .avatar-name .player-name { color: inherit; text-decoration: none; }
+.room-page .avatar-name .player-token { background: var(--cream); color: var(--ink); width: 16px; height: 16px; flex-basis: 16px; font-size: 9px; }
 .room-page .vote-button .player-identity { justify-content: center; text-align: left; }
 
 /* Reduced desktop: a single auxiliary panel opens beside the right column. */
@@ -199,16 +220,23 @@
 .layout-mobile .mute-button { min-width: 24px; }
 .layout-mobile .description-history { height: 100%; }
 .layout-mobile .description-history .history-rounds { max-height: none; min-height: 0; }
-.layout-mobile .description-history .history-rounds ol { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.layout-mobile .description-history .history-rounds ol { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.layout-mobile .description-history.clues-six .current-round ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .layout-mobile .description-history.clues-many .current-round ol { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
-.layout-mobile .description-history .current-round ol { grid-auto-rows: minmax(112px, auto); }
-.layout-mobile .description-history.clues-many .current-round ol { grid-auto-rows: minmax(128px, auto); }
-.layout-mobile .description-history.clues-many .current-round li { padding: 4px; gap: 3px; line-height: 1.2; }
-.layout-mobile .description-history .history-rounds li { padding: 7px; gap: 5px; font-size: 12px; line-height: 1.3; }
-.layout-mobile .description-history { padding: 8px; }
-.layout-mobile .description-history .panel-label { margin-bottom: 9px; }
-.layout-mobile .description-history .eyebrow, .layout-mobile .clue-author>.portrait { display: none; }
-.layout-mobile .clue-author .player-token { width: 18px; height: 18px; flex-basis: 18px; font-size: 10px; }
+.layout-mobile .description-history .current-round ol { grid-auto-rows: minmax(132px, auto); }
+.layout-mobile .description-history .history-rounds li { padding: 5px; gap: 4px; }
+.layout-mobile .clue-portrait { width: 38px; height: 43px; margin-right: 6px; }
+.layout-mobile .clue-text { font-size: 13px; }
+.layout-mobile .description-history.clues-many .current-round li { padding: 4px; gap: 3px; }
+.layout-mobile .clues-many .clue-portrait { width: 32px; height: 37px; margin-right: 4px; margin-bottom: 2px; padding: 1px; }
+.layout-mobile .clues-many .clue-text { font-size: 12px; line-height: 1.15; font-weight: 700; }
+.layout-mobile .clue-author { padding-top: 3px; }
+.layout-mobile .clue-author strong { font-size: 10px; }
+.layout-mobile .description-history { padding: 4px; }
+.layout-mobile .description-history .panel-label { margin-bottom: 4px; }
+.layout-mobile .description-history .panel-label h3 { font-size: 12px; line-height: 1.2; }
+.layout-mobile .description-history .eyebrow { display: none; }
+.layout-mobile .clue-author .player-token { width: 16px; height: 16px; flex-basis: 16px; font-size: 9px; }
 .layout-mobile.clues-open.in-game .room-overlay { grid-template-rows: minmax(58px, 1fr) auto auto 44px; gap: 6px; }
 .layout-mobile.clues-open .clues-zone { height: auto; max-height: none; }
 .layout-mobile.clues-open .description-history { height: auto; }
@@ -258,6 +286,9 @@
 .layout-mobile .communication-zone.expanded .voice-panel { border: 0; border-top: var(--line); border-radius: 0; }
 .layout-mobile.drawer-open .scene-toolbar, .room-page.chat-expanded .scene-toolbar { display: none; }
 .layout-mobile .touch-pad { top: auto; bottom: 190px; left: 12px; }
+@media (min-width: 600px) and (min-height: 600px) {
+  .layout-mobile .description-history .current-round ol { grid-auto-rows: minmax(104px, auto); }
+}
 @media (max-height: 599px) and (min-width: 600px) {
   .layout-mobile .room-overlay { grid-template-columns: minmax(0, 1fr) minmax(300px, 42%); grid-template-rows: minmax(0, 1fr) auto 42px; }
   .layout-mobile.drawer-open .room-overlay { grid-template-rows: minmax(0, 1fr) auto 42px; }
@@ -271,10 +302,14 @@
   .layout-mobile.clues-open.in-game .room-overlay { top: max(4px, env(safe-area-inset-top)); grid-template-columns: minmax(0, 1fr) minmax(300px, 42%); grid-template-rows: auto minmax(min-content, 1fr) 42px; gap: 5px; }
   .layout-mobile.clues-open.in-game .clues-zone { grid-area: 1 / 1 / 2 / 3; align-self: start; }
   .layout-mobile.clues-open.in-game .description-history .history-rounds ol { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .layout-mobile.clues-open.in-game .description-history .current-round ol { grid-auto-rows: minmax(72px, auto); }
-  .layout-mobile.clues-open.in-game .description-history .current-round li { padding: 4px; gap: 3px; line-height: 1.2; }
-  .layout-mobile.clues-open.in-game .description-history { padding: 3px; }
-  .layout-mobile.clues-open.in-game .description-history .panel-label { margin-bottom: 4px; }
+  .layout-mobile.clues-open.in-game .description-history.clues-many .current-round ol { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .layout-mobile.clues-open.in-game .description-history .current-round ol { grid-auto-rows: minmax(116px, auto); }
+  .layout-mobile.clues-open.in-game .description-history .current-round li { padding: 3px; gap: 2px; }
+  .layout-mobile.clues-open.in-game .clue-portrait { width: 32px; height: 37px; margin-right: 4px; margin-bottom: 2px; padding: 1px; }
+  .layout-mobile.clues-open.in-game .clue-text { font-size: 12px; line-height: 1.15; font-weight: 500; }
+  .layout-mobile.clues-open.in-game .clue-author { padding-top: 1px; }
+  .layout-mobile.clues-open.in-game .description-history { padding: 2px; }
+  .layout-mobile.clues-open.in-game .description-history .panel-label { margin-bottom: 2px; }
   .layout-mobile.clues-open.in-game .description-history .panel-label h3 { font-size: 12px; line-height: 1.2; }
   .layout-mobile.clues-open.in-game .description-history .panel-label .text-button { font-size: 10px; line-height: 1.2; }
   .layout-mobile.clues-open.in-game .secret-card, .layout-mobile.clues-open.in-game .turn-notice { display: none; }

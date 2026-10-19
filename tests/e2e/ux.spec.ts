@@ -1,9 +1,18 @@
 import { test, expect, type Page } from '@playwright/test';
 import { io, type Socket } from 'socket.io-client';
-import { DEFAULT_APPEARANCE, type Ack, type Command, type RoomSnapshot } from '@rene/contracts';
+import { type Ack, type Command, type RoomSnapshot } from '@rene/contracts';
+import { AVATAR_SPECIMENS } from '../../apps/web/src/avatar/specimens';
 import { showPanel, submitDescription } from './helpers';
 
 test.use({ launchOptions: { args: ['--autoplay-policy=no-user-gesture-required'] } });
+const viewports = [[1586, 992], [1366, 768], [1024, 768], [768, 1024], [390, 844], [844, 390]] as const;
+
+async function relativeSlots(page: Page) {
+  return page.locator('.current-round li').evaluateAll(nodes => nodes.map(node => {
+    const box = node.getBoundingClientRect(); const panel = node.closest('.clues-zone')!.getBoundingClientRect();
+    return { x: box.x - panel.x, y: box.y - panel.y };
+  }));
+}
 
 async function snapshot(page: Page) {
   return page.evaluate(async () => {
@@ -12,10 +21,39 @@ async function snapshot(page: Page) {
   });
 }
 
-for (const count of [4, 8, 12]) test(`all current clues remain readable with ${count} connected players`, async ({ page, playwright, baseURL }) => {
+async function expectCardIdentities(page: Page) {
+  const players = (await snapshot(page)).players;
+  const cards = await page.locator('.current-round li').evaluateAll(nodes => nodes.map(node => {
+    const portrait = node.querySelector('.clue-portrait')!;
+    const text = getComputedStyle(node.querySelector('.clue-text')!);
+    const name = getComputedStyle(node.querySelector('.player-name')!);
+    const surface = getComputedStyle(node);
+    const normalize = (value: string) => { const element = document.createElement('span'); element.style.color = value; return element.style.color; };
+    return {
+      id: node.getAttribute('data-player-id'), appearance: portrait.querySelector('svg')?.getAttribute('data-appearance'),
+      colour: surface.backgroundColor === normalize(surface.getPropertyValue('--player-color')),
+      contrast: text.color === normalize(surface.getPropertyValue('--player-foreground')) && name.color === text.color,
+      hierarchy: parseFloat(text.fontSize) > parseFloat(name.fontSize),
+      portraitVisible: getComputedStyle(portrait).display !== 'none' && portrait.getBoundingClientRect().width >= 32 && portrait.getBoundingClientRect().height >= 37,
+    };
+  }));
+  for (const card of cards) {
+    const a = players.find(p => p.id === card.id)!.appearance;
+    expect(card.appearance).toBe([a.head, a.hair, a.eyes, a.mouth, a.nose, a.accessory].join(':'));
+    expect(card.colour, `identity colour for ${card.id}`).toBe(true);
+    expect(card.contrast, `foreground contrast for ${card.id}`).toBe(true);
+    expect(card.hierarchy, `clue prominence for ${card.id}`).toBe(true);
+    expect(card.portraitVisible, `recognizable portrait for ${card.id}`).toBe(true);
+  }
+}
+
+for (const count of [4, 6, 8, 12]) test(`all current clues remain readable with ${count} connected players`, async ({ page, playwright, baseURL }) => {
   test.setTimeout(120000);
   await page.setViewportSize({ width: 1586, height: 992 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.addInitScript(appearance => {
+    if (!localStorage.getItem('rene-profile')) localStorage.setItem('rene-profile', JSON.stringify({ name: 'Renée', appearance }));
+  }, AVATAR_SPECIMENS[0]);
   await page.addInitScript(() => {
     const Original = window.RTCPeerConnection;
     const peers: RTCPeerConnection[] = []; Object.assign(window, { __uxVoicePeers: peers });
@@ -35,13 +73,25 @@ for (const count of [4, 8, 12]) test(`all current clues remain readable with ${c
       const cookie = (await context.storageState()).cookies.map(c => `${c.name}=${c.value}`).join('; ');
       const client = io(baseURL!, { transports: ['websocket'], autoConnect: false, extraHeaders: { Cookie: cookie, Origin: baseURL! } }); clients.set(id, client);
       await new Promise<void>((resolve, reject) => { client.once('connect', resolve); client.once('connect_error', reject); client.connect(); });
-      expect((await send(client, { type: 'room.join', code, name: `Suspect ${i + 1}`, appearance: DEFAULT_APPEARANCE })).ok).toBe(true);
+      expect((await send(client, { type: 'room.join', code, name: `Suspect ${i + 1}`, appearance: AVATAR_SPECIMENS[i] })).ok).toBe(true);
     }
     await expect(page.locator('.participants li')).toHaveCount(count);
     for (const client of clients.values()) expect((await send(client, { type: 'player.ready', ready: true })).ok).toBe(true);
     await page.getByRole('button', { name: 'Je suis prêt →', exact: true }).click();
     await page.getByRole('button', { name: /Lancer la partie/ }).click();
     await expect(page.locator('.phase-description')).toBeVisible({ timeout: 15000 });
+    await expectCardIdentities(page);
+    await expect(page.locator('.current-round [aria-current="step"]')).toContainText('À son tour');
+    await expect(page.locator('.current-round .clue-turn')).toHaveCount(1);
+    const waitingSlots = new Map<string, Awaited<ReturnType<typeof relativeSlots>>>();
+    for (const [width, height] of viewports) {
+      await page.setViewportSize({ width, height });
+      await showPanel(page, 'Indices');
+      await expect(page.locator('.clues-zone')).toBeVisible();
+      waitingSlots.set(`${width}x${height}`, await relativeSlots(page));
+    }
+    await page.setViewportSize({ width: 1586, height: 992 });
+    await expect(page.locator('.layout-desktop')).toBeVisible();
     const initialOrder = await page.locator('.current-round li').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-player-id')));
     const slots = () => page.locator('.current-round li').evaluateAll(nodes => nodes.map(node => { const box = node.getBoundingClientRect(); return { x: box.x, y: box.y }; }));
     const initialSlots = await slots();
@@ -64,6 +114,15 @@ for (const count of [4, 8, 12]) test(`all current clues remain readable with ${c
       await expect.poll(async () => (await snapshot(page)).game!.descriptions.length).toBe(i + 1);
       expect(await page.locator('.current-round li').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-player-id')))).toEqual(initialOrder);
       expect(await slots()).toEqual(initialSlots);
+      if (count === 12 && i === Math.floor(count / 2)) {
+        await page.screenshot({ path: 'output/playwright/v1.3.2-active-desktop.png' });
+        await page.setViewportSize({ width: 390, height: 844 });
+        await showPanel(page, 'Indices');
+        await expectCardIdentities(page);
+        await page.screenshot({ path: 'output/playwright/v1.3.2-active-mobile.png' });
+        await page.setViewportSize({ width: 1586, height: 992 });
+        await expect(page.locator('.layout-desktop')).toBeVisible();
+      }
     }
     const firstClient = clients.entries().next().value!;
     expect((await send(firstClient[1], { type: 'chat.send', text: 'Une couleur, le même suspect partout.' })).ok).toBe(true);
@@ -79,10 +138,12 @@ for (const count of [4, 8, 12]) test(`all current clues remain readable with ${c
     const peers = () => page.evaluate(() => (window as unknown as { __uxVoicePeers: RTCPeerConnection[] }).__uxVoicePeers.length);
     const connectedPeers = await peers();
     if (voice) expect(connectedPeers).toBeGreaterThan(0);
-    for (const [width, height] of [[1586, 992], [1366, 768], [1024, 768], [390, 844], [844, 390]] as const) {
+    for (const [width, height] of viewports) {
       await page.setViewportSize({ width, height });
       await showPanel(page, 'Indices');
-      await page.screenshot({ path: `output/playwright/v1.3.1-after-${count}-${width}x${height}.png` });
+      await page.screenshot({ path: `output/playwright/v1.3.2-${process.env.RENE_CLUE_CAPTURE ?? 'after'}-${count}-${width}x${height}.png` });
+      await expectCardIdentities(page);
+      expect(await relativeSlots(page), `stable slots at ${width}×${height}`).toEqual(waitingSlots.get(`${width}x${height}`));
       await expect(page.locator('.current-round li')).toHaveCount(count);
       const panel = (await page.locator('.clues-zone').boundingBox())!;
       expect(panel.y).toBeGreaterThanOrEqual(0);

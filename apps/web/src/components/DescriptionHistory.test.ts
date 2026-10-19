@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_APPEARANCE, type PublicGame, type PublicPlayer } from '@rene/contracts';
 import { DescriptionHistory } from './DescriptionHistory';
 import { PlayerName } from './PlayerName';
+import { AVATAR_SPECIMENS } from '../avatar/specimens';
 
 const players: PublicPlayer[] = Array.from({ length: 4 }, (_, i) => ({ id: `p${i}`, name: `Suspect ${i}`, appearance: DEFAULT_APPEARANCE, connected: true, ready: false, alive: true, waiting: false, score: 0, position: { x: 0, z: 4, yaw: 0 } }));
 const game: PublicGame = { id: 'fixture', phase: 'description', phaseId: 'fixture:4', round: 2, deadline: 10000, turnPlayerId: 'p2', playerMarks: { p0: 0, p1: 1, p2: 2, p3: 3 }, order: ['p1', 'p2', 'p3', 'p0'], descriptions: [{ playerId: 'p0', round: 1, text: 'Indice ancien', timedOut: false }, { playerId: 'p1', round: 2, text: 'Indice public', timedOut: false }], voteCandidates: [], voteCounts: null, readyToVotePlayerIds: [], votedPlayerIds: [], eliminatedPlayerId: null, whitePlayerId: null, result: null };
@@ -17,7 +18,7 @@ describe('current clues and public identities', () => {
     expect(html).toContain('Indices du tour 2'); expect(html).toContain('Tours passés · 1');
     expect(html).not.toContain('Indice ancien');
     expect(html).toContain('Indice public'); expect(html).toContain('Indice attendu');
-    expect(html).toContain('Cherche son indice…'); expect(html).toContain('data-player-mark="2"');
+    expect(html).toContain('À son tour…'); expect(html).toContain('data-player-mark="2"');
     render({ ...game, descriptions: [...game.descriptions, { playerId: 'p2', round: 2, text: 'Autre indice', timedOut: false }] });
     expect(game).toEqual(before);
   });
@@ -33,5 +34,17 @@ describe('current clues and public identities', () => {
     expect(html).toContain('René &amp; amis');
     const lobby = renderToStaticMarkup(createElement(PlayerName, { name: 'René' }));
     expect(lobby).not.toContain('player-token'); expect(lobby).not.toContain('data-player-mark');
+  });
+  it('keeps customized portraits and the public colour on submitted, active and waiting cards', () => {
+    const customized = players.map((p, i) => ({ ...p, appearance: AVATAR_SPECIMENS[i] }));
+    const html = renderToStaticMarkup(createElement(DescriptionHistory, { game, players: customized, visible: true }));
+    for (const p of customized) {
+      const card = html.split(`data-player-id="${p.id}"`)[1].split('</li>')[0];
+      expect(card).toContain(`data-appearance="${[p.appearance.head, p.appearance.hair, p.appearance.eyes, p.appearance.mouth, p.appearance.nose, p.appearance.accessory].join(':')}"`);
+      expect(card).toContain('clue-portrait');
+      expect(card).toContain('--player-color:');
+    }
+    expect(html).toContain('aria-label="À son tour"');
+    expect(html).not.toContain('Parle');
   });
 });
