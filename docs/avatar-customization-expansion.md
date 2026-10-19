@@ -86,3 +86,57 @@ La recette visuelle couvre les modèles contrastés de l'atelier et un salon de 
 Avec douze pseudonymes longs, certaines étiquettes 3D se chevauchent encore ; la liste et les portraits du HUD restent lisibles. La capture du salon conserve volontairement ce cas de charge.
 
 Aucune dépendance ajoutée. Caddy, Docker, LiveKit et la configuration du port HTTP 8080 ne sont pas modifiés.
+
+## Audit pré-fusion — synchronisation E2E
+
+### Diagnostic du commit `455c340a`
+
+Le [workflow push en échec](https://github.com/RomainMarcadet/rene/actions/runs/39219694453) et son artefact `playwright-results` ont été inspectés : logs, chronologie des actions et snapshots DOM de la trace Playwright. Le [workflow pull_request du même commit](https://github.com/RomainMarcadet/rene/actions/runs/39219720712) réussissait. Les deux exécutions validaient les 179 tests de `npm run check` ; le push obtenait huit E2E réussis, un échec et sept scénarios vocaux ignorés, contre neuf réussites et sept ignorés pour la PR.
+
+La course se situait dans `describe`, à l'ancienne ligne 19 de `tests/e2e/social.spec.ts`. `locator.click()` attend le clic DOM, mais pas la confirmation Socket.IO ni le rendu React du tour suivant. La boucle cherchait donc immédiatement un champ encore visible et pouvait sélectionner une seconde fois le joueur qui venait de parler.
+
+Chronologie extraite de la trace, relative à la fin du premier clic de validation :
+
+| Instant relatif | Événement |
+| --- | --- |
+| 0 ms | Le clic de validation du premier indice termine. |
+| +4 à +15 ms | `isVisible()` teste encore le champ de Camille et renvoie `true`. |
+| +21 ms | La saisie suivante vise de nouveau la page de Camille. |
+| Environ +8,2 s | La saisie expire : le formulaire a été démonté. Le snapshot final montre le premier indice publié et Sam au tour de parole. |
+
+Le serveur avait donc accepté la contribution et avancé normalement ; aucune expiration du chronomètre de description ne provoquait cet échec. Cette boucle existait déjà dans `main` et n'avait pas été modifiée par l'extension des avatars. Le timing de la CI rendait visible une attente manquante dans le test. L'échec ne démontre pas un blocage du rendu 3D.
+
+### Reproduction et correction
+
+Un scénario de régression utilise quatre vrais navigateurs, dont un mobile, quatre apparences étendues et le serveur réel. Il retarde uniquement l'envoi des commandes de description de **400 ms** via la route WebSocket de Playwright, sans changer leur contenu, les snapshots, les délais du jeu ni les timeouts de test. Il vérifie que les quatre connexions ont été interceptées et que les quatre commandes ont réellement subi le délai.
+
+**Avant correction**, ce scénario reproduit le timeout de huit secondes sur la saisie suivante : l'ancien champ contenant le premier indice est détecté, puis détaché du DOM pendant la seconde saisie. La trace locale de reproduction a été conservée hors du dépôt.
+
+Le helper partagé `submitDescription` attend désormais :
+
+1. Le démontage du formulaire de l'émetteur après validation.
+2. L'affichage du nouvel indice dans l'historique de chacun des clients observateurs.
+
+La seconde condition évite de confondre une contribution acceptée avec un champ disparu à cause d'une expiration. La même attente est utilisée dans les parcours social, partie complète et élimination vocale. Le scénario vérifie ensuite l'ordre des contributions, leur réception chez les quatre clients et l'absence d'indices expirés. Les assertions métier existantes sont conservées ou renforcées.
+
+**Après correction**, les cinq répétitions du scénario sous latence réussissent. Les 42 tests ciblés réseau/salles/rendu/animations passent également. Le timeout d'action reste à 8 000 ms, sans retry ajouté ; ni le code applicatif ni les modèles d'avatars ne sont modifiés par ce correctif.
+
+### Bilan de revue
+
+| Dimension | Évaluation dans le périmètre du correctif |
+| --- | --- |
+| Correction | Course reproduite puis corrigée par une attente de l'état confirmé. |
+| Performance | Quatre modèles étendus franchissent les descriptions sous latence ; le test à douze et ses mesures de rendu restent couverts par la suite complète. Aucun ralentissement bloquant attribuable aux modèles n'est établi par la trace de l'incident. |
+| Maintenabilité | Attente commune à trois parcours ; régression utilisant le véritable transport et contrôlant l'ordre des contributions. |
+| Sécurité et périmètre | Validation serveur et confidentialité inchangées ; modifications limitées aux tests et au présent rapport. |
+
+### Validation finale du correctif
+
+- `npm run check` : TypeScript, ESLint, **179 tests dans 16 fichiers** et builds réussis.
+- `RENE_VOICE_E2E=1 npm run test:e2e` : **17 scénarios réussis en 7,2 minutes**, sans scénario ignoré. Le parcours social qui échouait en CI, la partie complète, la reconnexion et les sept scénarios LiveKit passent.
+- Régression sous latence : **cinq répétitions réussies**, après reproduction de l'échec avec l'ancienne attente.
+- Tests ciblés réseau, salles, rendu et animations : **42 réussites**.
+- Le salon à douze apparences conserve **307 appels de rendu et 34 336 triangles**. Les descriptions avec quatre modèles étendus, les emotes et les phases de jeu restent fonctionnelles dans la suite complète.
+- Aucun timeout augmenté, aucun retry ajouté, aucune modification du code applicatif, des modèles, du workflow ou de l'infrastructure.
+
+Les résultats GitHub du dernier commit sont consultables dans les [vérifications de la PR #5](https://github.com/RomainMarcadet/rene/pull/5/checks) et les [workflows de la branche](https://github.com/RomainMarcadet/rene/actions?query=branch%3Afeature%2Favatar-customization-expansion). Les événements `push` et `pull_request` doivent être examinés séparément : la réussite de l'un ne remplace pas celle de l'autre. Le workflow existant ignore les sept scénarios vocaux faute de service LiveKit ; ces scénarios sont couverts par l'exécution locale complète ci-dessus.

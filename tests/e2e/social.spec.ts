@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
-import { joinFour, showPanel } from './helpers';
+import { joinFour, showPanel, submitDescription } from './helpers';
+import { AVATAR_SPECIMENS } from '../../apps/web/src/avatar/specimens';
 
 async function state(page: Page) {
   return page.evaluate(async () => {
@@ -16,10 +17,49 @@ async function describe(pages: Page[]) {
       for (const [index, page] of pages.entries()) if (await page.getByLabel('Votre indice', { exact: true }).isVisible()) return speaker = index;
       return -1;
     }).not.toBe(-1);
-    await pages[speaker].getByLabel('Votre indice', { exact: true }).fill(`Indice ${i}`);
-    await pages[speaker].getByRole('button', { name: /Valider mon indice/ }).click();
+    await submitDescription(pages[speaker], `Indice ${i}`, pages);
   }
 }
+
+test('description turns stay synchronized with delayed commands and expanded avatars', async ({ browser, baseURL }) => {
+  let intercepted = 0; let delayed = 0;
+  const pending = new Set<ReturnType<typeof setTimeout>>();
+  const { contexts, pages } = await joinFour(browser, baseURL!, 3, async (context, index) => {
+    await context.addInitScript(appearance => localStorage.setItem('rene-profile', JSON.stringify({ name: 'Spécimen', appearance })), AVATAR_SPECIMENS[index]);
+    await context.routeWebSocket(url => url.pathname === '/socket.io/', socket => {
+      intercepted++;
+      const server = socket.connectToServer();
+      socket.onMessage(message => {
+        const packet = typeof message === 'string' ? message.match(/^42\d*(\[.*)$/s) : null;
+        const [event, envelope] = packet ? JSON.parse(packet[1]) : [];
+        if (event === 'command' && envelope?.command?.type === 'game.describe') {
+          delayed++;
+          // Real server, ordered messages: expose the window between click and confirmation.
+          const timer = setTimeout(() => { pending.delete(timer); server.send(message); }, 400);
+          pending.add(timer);
+        } else server.send(message);
+      });
+    });
+  });
+  try {
+    await expect.poll(() => intercepted).toBe(4);
+    for (const [index, page] of pages.entries()) {
+      const room = (await state(page)).room;
+      expect(room.players[index].appearance).toEqual(AVATAR_SPECIMENS[index]);
+      await page.getByRole('button', { name: 'Je suis prêt →', exact: true }).click();
+    }
+    await pages[0].getByRole('button', { name: /Lancer la partie/ }).click();
+    await describe(pages);
+    expect(delayed).toBe(4);
+    for (const page of pages) {
+      await expect(page.locator('.phase-discussion')).toBeVisible();
+      const game = (await state(page)).room.game;
+      expect(game.descriptions.map((d: { text: string }) => d.text)).toEqual(['Indice 0', 'Indice 1', 'Indice 2', 'Indice 3']);
+      expect(game.descriptions.map((d: { playerId: string }) => d.playerId)).toEqual(game.order);
+      expect(game.descriptions.every((d: { timedOut: boolean }) => !d.timedOut)).toBe(true);
+    }
+  } finally { pending.forEach(clearTimeout); await Promise.all(contexts.map(context => context.close())); }
+});
 
 test('four clients react, unanimously start voting and reveal White before a tolerant guess and replay', async ({ browser, baseURL }) => {
   test.setTimeout(180000);
