@@ -33,7 +33,7 @@ async function actor(running: Running, url: string, previous?: { cookie: string;
   return current;
 }
 function send(actor: Actor, command: Command, overrides?: Partial<CommandEnvelope>) {
-  const envelope: CommandEnvelope = { id: crypto.randomUUID(), command, ...(actor.snapshot?.game ? { phaseId: actor.snapshot.game.phaseId } : {}), ...overrides };
+  const envelope: CommandEnvelope = { id: crypto.randomUUID(), command, socialGeneration: actor.snapshot?.social.generation, ...(actor.snapshot?.game ? { phaseId: actor.snapshot.game.phaseId } : {}), ...overrides };
   return new Promise<Ack>((resolve, reject) => {
     actor.socket.timeout(3000).emit('command', envelope, (error: Error | null, ack: Ack) => error ? reject(error) : resolve(ack));
   });
@@ -303,4 +303,46 @@ describe('real Socket.IO clients', () => {
     const { running, url } = await server(); await actor(running, url);
     await running.app.close(); apps.splice(apps.indexOf(running), 1);
   }, 5000);
+  it('deduplicates cartoon impacts, preserves clocks/cooldowns on reconnect and rejects stale social generations', async () => {
+    const { running, url, actors, room } = await opened();
+    const [a, b] = actors; room.players.get(a.playerId)!.position = { x: 4, z: 0, yaw: 0 }; room.players.get(b.playerId)!.position = { x: 4, z: 1.2, yaw: Math.PI };
+    const command = { type: 'player.attack', kind: 'punch', targetId: b.playerId } as const;
+    const duplicate = crypto.randomUUID();
+    expect((await send(a, command, { id: duplicate })).ok).toBe(true);
+    expect((await send(a, command, { id: duplicate, phaseId: crypto.randomUUID() })).ok).toBe(true);
+    await new Promise(resolve => setTimeout(resolve, 200)); running.tick();
+    await expect.poll(() => b.snapshot?.social.players[b.playerId].physical?.kind).toBe('hit_reaction');
+    expect(room.players.get(b.playerId)!.social.hits).toHaveLength(1);
+    const attack = a.snapshot!.social.players[a.playerId].animation;
+    a.socket.disconnect(); const resumed = await actor(running, url, a); await send(resumed, { type: 'room.resume' });
+    await expect.poll(() => resumed.snapshot?.social.players[a.playerId].animation?.instanceId).toBe(attack!.instanceId);
+    expect((await send(resumed, { type: 'player.attack', kind: 'slap', targetId: b.playerId })).ok).toBe(false);
+    const generation = room.social.generation;
+    for (const x of [resumed, ...actors.slice(1)]) await send(x, { type: 'player.ready', ready: true });
+    await send(resumed, { type: 'game.start' });
+    expect(room.social.generation).toBe(generation + 1);
+    expect((await send(resumed, command, { id: duplicate, socialGeneration: generation })).ok).toBe(false);
+    for (const x of actors.slice(1)) {
+      expect(x.snapshot?.social).not.toHaveProperty('pending');
+      expect(x.snapshot?.social.players[b.playerId]).not.toHaveProperty('hits');
+      expect(x.snapshot?.game).not.toHaveProperty('roles'); expect(x.snapshot?.game).not.toHaveProperty('words');
+    }
+    const outsider = await actor(running, url);
+    const other = await send(outsider, { type: 'room.create', name: 'Autre salon', appearance: DEFAULT_APPEARANCE }); expect(other.ok).toBe(true);
+    await expect.poll(() => !!outsider.snapshot?.social.generation).toBe(true);
+    expect((await send(outsider, { type: 'player.attack', kind: 'punch', targetId: b.playerId })).ok).toBe(false);
+  });
+  it('reserves command capacity for descriptions and votes when emotes are spammed', async () => {
+    const { running, actors, room } = await opened();
+    for (const a of actors) await send(a, { type: 'player.ready', ready: true });
+    await send(actors[0], { type: 'game.start' }); await expire(running, room, actors[0]);
+    const first = actors.find(a => a.playerId === room.game!.turnPlayerId)!;
+    const phaseId = room.game!.phaseId;
+    const spam = Array.from({ length: 40 }, () => send(first, { type: 'player.emote', kind: 'wave' }, { phaseId }));
+    const business = send(first, { type: 'game.describe', text: 'Indice fictif prioritaire' }, { phaseId });
+    expect((await business).ok).toBe(true);
+    expect((await Promise.all(spam)).filter(a => !a.ok).length).toBeGreaterThan(0);
+    expect(room.game!.descriptions.at(-1)?.text).toBe('Indice fictif prioritaire');
+  });
+
 });

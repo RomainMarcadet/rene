@@ -6,7 +6,7 @@ import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
 import staticFiles from '@fastify/static';
 import { Server, type Socket } from 'socket.io';
-import { DEFAULT_APPEARANCE, EnvelopeSchema, MoveSchema, type Ack, type ClientEvents, type ServerEvents } from '@rene/contracts';
+import { DEFAULT_APPEARANCE, isSocialCommand, EnvelopeSchema, MoveSchema, type Ack, type ClientEvents, type ServerEvents } from '@rene/contracts';
 import { createPersistence, type Persistence, type Guest } from './persistence.js';
 import { readConfig, type Config } from './config.js';
 import { Rooms, MemoryRoomStore, type Room } from './rooms.js';
@@ -30,6 +30,9 @@ export async function createApp(options: AppOptions = {}) {
   const players = new Map<string, GameSocket>();
   const recent = new Map<string, Map<string, { fingerprint: string; ack: Ack }>>();
   const recentAt = new Map<string, number>();
+  const budgets = new Map<string, { business: TokenBucket; social: TokenBucket; total: TokenBucket; at: number }>();
+  const globalSocial = new TokenBucket(240, 120);
+  const globalBusiness = new TokenBucket(1000, 500);
   const voice = new VoiceService(config, error => app.log.warn({ err: error }, 'Vocal : nettoyage différé'));
 
   const authenticate = async (header: string | undefined) => {
@@ -93,11 +96,11 @@ export async function createApp(options: AppOptions = {}) {
       socket.data.guest = guest; next();
     } catch { next(new Error('Connexion momentanément indisponible.')); }
   });
-  const broadcast = (room: Room) => {
+  const broadcast = (room: Room, includePrivate = true) => {
     if (rooms.store.get(room.code) !== room) return;
-    voice.synchronize(room);
+    if (includePrivate) voice.synchronize(room);
     io.to(room.code).emit('snapshot', rooms.snapshot(room, Date.now()));
-    for (const id of room.players.keys()) players.get(id)?.emit('private', rooms.privateSnapshot(room, id));
+    if (includePrivate) for (const id of room.players.keys()) players.get(id)?.emit('private', rooms.privateSnapshot(room, id));
   };
   const active = (socket: GameSocket) => players.get(socket.data.guest.id)?.id === socket.id;
 
@@ -108,26 +111,31 @@ export async function createApp(options: AppOptions = {}) {
     // Replace first so the old disconnect handler cannot mark the new connection offline.
     players.set(guest.id, socket);
     if (previous && previous.id !== socket.id) { previous.emit('replaced'); previous.disconnect(true); }
-    const commands = new TokenBucket(30, 8);
+    const budget = budgets.get(guest.id) ?? { business: new TokenBucket(30, 8), social: new TokenBucket(6, 3), total: new TokenBucket(120, 40), at: Date.now() };
+    budgets.set(guest.id, budget);
+    const invalid = new TokenBucket(8, 2);
     const moves = new TokenBucket(30, 20);
-    let pending = 0;
+    let pending = 0; let pendingSocial = 0; let movePending = false;
 
     socket.on('command', (input, callback) => {
       const ack = typeof callback === 'function' ? callback : () => undefined;
       if (!active(socket)) return ack({ ok: false, error: 'Cette place est ouverte dans un autre onglet.' });
-      if (!commands.take() || pending >= 12) return ack({ ok: false, error: 'Trop d’actions. Réessaie dans un instant.' });
       const parsed = EnvelopeSchema.safeParse(input);
-      if (!parsed.success) return ack({ ok: false, error: 'Action invalide.' });
+      if (!parsed.success) { if (invalid.take()) ack({ ok: false, error: 'Action invalide.' }); return; }
       const envelope = parsed.data;
-      pending++;
+      const social = isSocialCommand(envelope.command.type);
+      if (pending >= 12 || (social && pendingSocial >= 2) || !(social ? budget.social : budget.business).take() || !(social ? globalSocial : globalBusiness).take() || !budget.total.take()) return ack({ ok: false, error: 'Trop d’actions. Réessaie dans un instant.' });
+      budget.at = Date.now(); pending++; if (social) pendingSocial++;
       // Lock a player's membership first, then lock its room (also shared with timers).
       void queue.run(`player:${guest.id}`, async () => {
         if (!active(socket)) throw new Error('Cette place est ouverte dans un autre onglet.');
         const saved = recent.get(guest.id)?.get(envelope.id);
-        const fingerprint = JSON.stringify({ command: envelope.command, phaseId: envelope.phaseId });
+        const fingerprint = JSON.stringify({ command: envelope.command, ...(social ? { socialGeneration: envelope.socialGeneration } : { phaseId: envelope.phaseId }) });
         if (saved) {
+          const currentRoom = rooms.roomFor(guest.id);
+          if (social && (!currentRoom || envelope.socialGeneration !== currentRoom.social.generation)) throw new Error('Cette action sociale appartient à un ancien contexte.');
           if (saved.fingerprint !== fingerprint) throw new Error('Identifiant d’action déjà utilisé.');
-          const room = rooms.roomFor(guest.id); if (room) broadcast(room);
+          const room = rooms.roomFor(guest.id); if (room) broadcast(room, !social);
           recentAt.set(guest.id, Date.now()); ack(saved.ack); return;
         }
         const command = envelope.command;
@@ -171,9 +179,9 @@ export async function createApp(options: AppOptions = {}) {
               await persistence.saveGuest(guest).catch(error => { app.log.error({ err: error }, 'Profil'); throw new Error('Impossible de sauvegarder ton profil pour le moment.'); }); break;
             default:
               if (!room) throw new Error('Rejoins une salle pour continuer.');
-              await rooms.command(room, guest.id, command, now);
+              await rooms.command(room, guest.id, command, now, envelope.socialGeneration);
           }
-          if (room && room.revision !== priorRevision) broadcast(room);
+          if (room && room.revision !== priorRevision) broadcast(room, !social);
           return { ok: true, ...(room ? { code: room.code } : {}) };
         });
         const history = recent.get(guest.id) ?? new Map<string, { fingerprint: string; ack: Ack }>();
@@ -181,16 +189,23 @@ export async function createApp(options: AppOptions = {}) {
         if (history.size > 128) history.delete(history.keys().next().value!);
         recent.set(guest.id, history); recentAt.set(guest.id, Date.now()); ack(result);
       }).catch(error => {
-        const room = rooms.roomFor(guest.id); if (room) broadcast(room);
+        const room = rooms.roomFor(guest.id); if (room) broadcast(room, !social);
         if (!(error instanceof Error)) app.log.error({ err: error }, 'Action échouée');
         ack({ ok: false, error: error instanceof Error ? error.message : 'Action momentanément indisponible.' });
-      }).finally(() => { pending--; });
+      }).finally(() => { pending--; if (social) pendingSocial--; });
     });
     socket.on('move', input => {
       if (!active(socket) || !moves.take()) return;
       const parsed = MoveSchema.safeParse(input); const room = rooms.roomFor(guest.id);
       if (!room || !parsed.success) return;
-      if (rooms.move(room, guest.id, parsed.data, Date.now())) io.to(room.code).emit('poses', { [guest.id]: room.players.get(guest.id)!.position });
+      if (movePending) return;
+      movePending = true;
+      void queue.run(`room:${room.code}`, async () => {
+        if (!active(socket) || rooms.roomFor(guest.id) !== room) return;
+        const revision = room.revision;
+        if (rooms.move(room, guest.id, parsed.data, Date.now())) io.to(room.code).emit('poses', { [guest.id]: room.players.get(guest.id)!.position });
+        if (room.revision !== revision) broadcast(room, false);
+      }).catch(error => app.log.error({ err: error }, 'Déplacement')).finally(() => { movePending = false; });
     });
     socket.on('disconnect', () => {
       if (!active(socket)) return;
@@ -209,13 +224,15 @@ export async function createApp(options: AppOptions = {}) {
     const now = Date.now();
     if (now - lastCacheCleanup > 60_000) {
       lastCacheCleanup = now;
+      for (const [id, budget] of budgets) if (!players.has(id) && now - budget.at > 60 * 60_000) budgets.delete(id);
       for (const [id, at] of recentAt) if (!players.has(id) && now - at > 60 * 60_000) { recent.delete(id); recentAt.delete(id); }
     }
     for (const room of rooms.store.values()) {
       if (ticking.has(room.code)) continue;
       ticking.add(room.code);
       void queue.run(`room:${room.code}`, async () => {
-        if (await rooms.tick(room, Date.now())) broadcast(room);
+        const previousGame = room.game;
+        if (await rooms.tick(room, Date.now())) broadcast(room, room.game !== previousGame);
         if (!rooms.store.get(room.code)) {
           for (const id of room.players.keys()) { recent.delete(id); recentAt.delete(id); }
           await voice.closeRoom(room.code);
@@ -223,7 +240,7 @@ export async function createApp(options: AppOptions = {}) {
       }).catch(error => app.log.error({ err: error }, 'Synchronisation du salon')).finally(() => ticking.delete(room.code));
     }
   };
-  const timer = options.timers === false ? null : setInterval(tick, 200);
+  const timer = options.timers === false ? null : setInterval(tick, 50);
   timer?.unref();
 
   const webRoot = options.webRoot ?? resolve(process.cwd(), process.cwd().endsWith('apps/server') ? '../web/dist' : 'apps/web/dist');

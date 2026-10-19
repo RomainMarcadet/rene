@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { AppearanceSchema, type AvatarAppearance } from './appearance.js';
 export * from './appearance.js';
 export * from './playerMarks.js';
+export * from './social.js';
+import { AnimationIdSchema, AttackKindSchema, type SocialSnapshot } from './social.js';
 export const SettingsSchema = z.object({
   automaticRoles: z.boolean(), undercoverCount: z.number().int().min(0).max(10), whiteCount: z.number().int().min(0).max(10),
   descriptionSeconds: z.number().int().min(10).max(180), discussionSeconds: z.number().int().min(15).max(600),
@@ -37,7 +39,7 @@ export interface PublicGame {
 }
 export type ChatReaction = 'up' | 'down';
 export interface ChatMessage { id: string; playerId: string; name: string; text: string; at: number; reactions: { up: number; down: number } }
-export interface RoomSnapshot { code: string; revision: number; hostId: string; players: PublicPlayer[]; settings: RoomSettings; game: PublicGame | null; chat: ChatMessage[]; completedGames: number; voiceGeneration: number; serverNow: number; resultsPending: boolean }
+export interface RoomSnapshot { social: SocialSnapshot; code: string; revision: number; hostId: string; players: PublicPlayer[]; settings: RoomSettings; game: PublicGame | null; chat: ChatMessage[]; completedGames: number; voiceGeneration: number; serverNow: number; resultsPending: boolean }
 export interface PrivateGameState { playerId: string; inGame: boolean; word: string | null; voteTarget: string | null }
 export interface PrivatePlayerState extends PrivateGameState { chatReactions: Record<string, ChatReaction> }
 export interface VoiceCredentials { url: string; token: string; generation: number; canPublish: boolean }
@@ -58,10 +60,16 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('game.setVoteReady'), ready: z.boolean() }).strict(),
   z.object({ type: z.literal('chat.react'), messageId: z.string().min(1).max(100), reaction: z.enum(['up', 'down']).nullable() }).strict(),
   z.object({ type: z.literal('chat.send'), text: z.string().trim().min(1).max(400) }),
-  z.object({ type: z.literal('player.emote'), kind: z.enum(['wave', 'dance', 'suspect']) }),
+  z.object({ type: z.literal('player.emote'), kind: AnimationIdSchema, targetId: z.string().min(1).max(100).optional() }).strict(),
+  z.object({ type: z.literal('player.emote.stop'), instanceId: z.string().min(1).max(100) }).strict(),
+  z.object({ type: z.literal('player.attack'), kind: AttackKindSchema, targetId: z.string().min(1).max(100).optional() }).strict(),
+  z.object({ type: z.literal('player.interaction.preferences'), acceptsPhysical: z.boolean() }).strict(),
+  z.object({ type: z.literal('player.interaction.invite'), kind: z.enum(['hug', 'carry']), targetId: z.string().min(1).max(100) }).strict(),
+  z.object({ type: z.literal('player.interaction.respond'), interactionId: z.string().min(1).max(100), accept: z.boolean() }).strict(),
+  z.object({ type: z.literal('player.interaction.cancel'), interactionId: z.string().min(1).max(100) }).strict(),
 ]);
 export type Command = z.infer<typeof CommandSchema>;
-export const EnvelopeSchema = z.object({ id: z.string().min(8).max(100), command: CommandSchema, phaseId: z.string().max(100).optional() }).strict();
+export const EnvelopeSchema = z.object({ id: z.string().min(8).max(100), command: CommandSchema, phaseId: z.string().max(100).optional(), socialGeneration: z.number().int().nonnegative().optional() }).strict();
 export type CommandEnvelope = z.infer<typeof EnvelopeSchema>;
 export type Ack = { ok: true; code?: string } | { ok: false; error: string };
 export const MoveSchema = z.object({ x: z.number().finite().min(-1).max(1), z: z.number().finite().min(-1).max(1) }).strict();
