@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { reuseAppearances } from './snapshots';
 import { commandId } from './commandId';
 import { io, type Socket } from 'socket.io-client';
 import { AppearanceSchema, DEFAULT_APPEARANCE, type AvatarAppearance, type ClientEvents, type Command, type PrivatePlayerState, type RoomSnapshot, type ServerEvents } from '@rene/contracts';
@@ -88,7 +89,7 @@ export function initialize() {
       });
       socket.on('snapshot', room => {
         const previous = useGame.getState().room;
-        useGame.setState({ room, offset: room.serverNow - Date.now(), ...(previous?.game?.id !== room.game?.id ? { secret: null } : {}) });
+        useGame.setState({ room: { ...room, players: reuseAppearances(room.players, previous?.players) }, offset: room.serverNow - Date.now(), ...(previous?.game?.id !== room.game?.id ? { secret: null } : {}) });
         const url = new URL(location.href); url.searchParams.set('room', room.code); history.replaceState(null, '', url);
       });
       socket.on('private', secret => useGame.setState({ secret }));

@@ -1,7 +1,8 @@
 import { lazy, Suspense, useLayoutEffect, useRef, useState } from 'react';
-import { canMoveInPhase, type RoomSnapshot } from '@rene/contracts';
+import { socialPhaseAllowed, type RoomSnapshot } from '@rene/contracts';
 import { notify, saveProfile, send, useGame } from '../store';
 import { AvatarEditor } from './AvatarEditor';
+import { SocialControls } from './SocialControls';
 import { Gameplay } from './Gameplay';
 import { Modal } from './Modal';
 import { HowToPlay } from './HowToPlay';
@@ -23,6 +24,7 @@ export function RoomView({ room }: { room: RoomSnapshot }) {
   const [appearance, setAppearance] = useState(player.appearance); const [name, setName] = useState(player.name);
   const [drawer, setDrawer] = useState<Drawer | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [socialOpen, setSocialOpen] = useState(false);
   const viewport = useRoomViewport(); const root = useRef<HTMLElement>(null);
   const [clearArea, setClearArea] = useState<ClearArea>({ left: 0, top: 80, width: viewport.width, height: viewport.height - 80 });
   const active = room.game && room.game.phase !== 'results';
@@ -51,13 +53,13 @@ export function RoomView({ room }: { room: RoomSnapshot }) {
     </section>
     <div className="navigation-zone" data-occluder><RoomNavigation room={room} compact={viewport.layout === 'mobile'} onOpen={setModal} onInvite={invite} /></div>
     <div className="scene-caption"><span className="pill">CHEZ RENÉ</span><span>{room.players.filter(p => p.connected).length} / 12 DANS LE SALON</span></div>
-    <div className="scene-toolbar" aria-label="Émotes"><span>{canMoveInPhase(room.game?.phase) ? 'ZQSD / FLÈCHES' : 'À TABLE !'}</span><div>{([['wave', 'Salut', '✋'], ['dance', 'Danse', '♫'], ['suspect', 'Soupçon', '◉']] as const).map(([kind, label, icon]) => <button key={kind} title={label} aria-label={`Emote ${label}`} onClick={() => void send({ type: 'player.emote', kind })}>{icon}</button>)}</div></div>
+    <SocialControls room={room} open={socialOpen} setOpen={setSocialOpen} />
     <div className="room-overlay">
       <div className="gameplay-zone" data-occluder><Gameplay room={room} /></div>
       <div id="room-suspects" className="suspects-zone" hidden={!showSuspects} data-occluder><Suspects room={room} onCustomize={customize} /></div>
       <div id="room-clues" className="clues-zone" hidden={!showClues} data-occluder><DescriptionHistory key={room.game?.id ?? 'lobby'} game={room.game} players={room.players} visible={showClues} /></div>
       <Communication room={room} visible={showChat} onExpand={setExpanded} />
-      <nav className="drawer-tabs" aria-label="Panneaux du salon" data-occluder>{([['suspects', 'Suspects'], ['clues', 'Indices'], ['discussion', 'Discussion']] as const).map(([tab, label]) => <button key={tab} aria-expanded={drawer === tab} aria-controls={tab === 'discussion' ? 'room-discussion' : `room-${tab}`} onClick={() => setDrawer(drawer === tab ? null : tab)}>{label}{tab === 'suspects' ? ` · ${room.players.length}` : tab === 'clues' && room.game?.descriptions.length ? ` · ${room.game.descriptions.length}` : ''}<span>{drawer === tab ? '⌄' : '⌃'}</span></button>)}</nav>
+      <nav className="drawer-tabs" aria-label="Panneaux du salon" data-occluder>{([['suspects', 'Suspects'], ['clues', 'Indices'], ['discussion', 'Discussion']] as const).map(([tab, label]) => <button key={tab} aria-expanded={drawer === tab} aria-controls={tab === 'discussion' ? 'room-discussion' : `room-${tab}`} onClick={() => setDrawer(drawer === tab ? null : tab)}>{label}{tab === 'suspects' ? ` · ${room.players.length}` : tab === 'clues' && room.game?.descriptions.length ? ` · ${room.game.descriptions.length}` : ''}<span>{drawer === tab ? '⌄' : '⌃'}</span></button>)}<button id="room-social-button" className="drawer-social" data-invite={room.social.interactions.some(i => i.toId === me && i.state === 'invited') || undefined} aria-label="Gestes du salon" disabled={!socialPhaseAllowed(room.game?.phase)} onClick={() => setSocialOpen(true)}>＋</button></nav>
     </div>
     {modal === 'help' && <HowToPlay onClose={() => setModal(null)} />}
     {modal === 'avatar' && <Modal title="Une tête à vous." onClose={() => setModal(null)}><label className="field">Votre petit nom<input value={name} maxLength={24} onChange={e => setName(e.target.value)} /></label><AvatarEditor value={appearance} onChange={setAppearance} /><button className="button button-yellow wide" disabled={!name.trim()} onClick={async () => { if (await send({ type: 'profile.update', name, appearance })) { saveProfile(name, appearance); setModal(null); } }}>Voilà ma nouvelle tête →</button></Modal>}

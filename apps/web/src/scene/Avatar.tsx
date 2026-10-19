@@ -1,47 +1,59 @@
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
-import { MathUtils, type Group, type Mesh } from 'three';
-import type { AvatarAppearance, Emote } from '@rene/contracts';
+import { MathUtils, Shape, ShapeGeometry, type Group, type Mesh } from 'three';
+import { physicalStage, type AvatarAppearance, type Emote, type Phase, type SocialPlayerState } from '@rene/contracts';
 import { PlayerName } from '../components/PlayerName';
-import { avatarPose } from './animation';
+import { avatarPose, createPose, type Pose } from './animation';
+import { ArticulatedArm, ArticulatedLeg } from './ArticulatedLimbs';
 import { AvatarHead, avatarGeometry, avatarMaterial } from '../avatar/PartMeshes';
 import { buildAvatarModel } from '../avatar/model';
-const ink = '#191719';
-function Ball({ at, scale = [1, 1, 1], color }: { at: [number, number, number]; scale?: [number, number, number]; color: string }) { return <mesh position={at} scale={scale} geometry={avatarGeometry.sphere} material={avatarMaterial(color)} dispose={null} />; }
-export function Avatar({ appearance: a, position = [0, 0, 0], yaw = 0, name, mark, speaking, selected, dead, winner, emote, emoteUntil, onClick, seated = false, reducedMotion = false }: { appearance: AvatarAppearance; position?: [number, number, number]; yaw?: number; name?: string; mark?: number; speaking?: boolean; selected?: boolean; dead?: boolean; winner?: boolean; emote?: Emote; emoteUntil?: number; onClick?: () => void; seated?: boolean; reducedMotion?: boolean }) {
+const star = new Shape();
+for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5 + Math.PI / 2; const r = i % 2 ? .45 : 1; if (i) star.lineTo(Math.cos(a) * r, Math.sin(a) * r); else star.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+star.closePath(); const starGeometry = new ShapeGeometry(star);
+interface Props { appearance: AvatarAppearance; position?: [number, number, number]; yaw?: number; name?: string; mark?: number; speaking?: boolean; selected?: boolean; dead?: boolean; winner?: boolean; emote?: Emote; emoteUntil?: number; onClick?: () => void; seated?: boolean; reducedMotion?: boolean; social?: SocialPlayerState; serverOffset?: number; phase?: Phase; recipient?: boolean; partner?: { x: number; z: number } }
+export function Avatar({ appearance: a, position = [0, 0, 0], yaw = 0, name, mark, speaking, selected, dead, winner, emote, emoteUntil, onClick, seated = false, reducedMotion = false, social, serverOffset = 0, phase, recipient, partner }: Props) {
   const model = useMemo(() => buildAvatarModel(a, dead), [a, dead]);
   const initialPosition = useRef(position);
-  const group = useRef<Group>(null); const puppet = useRef<Group>(null); const head = useRef<Group>(null); const leftArm = useRef<Group>(null); const rightArm = useRef<Group>(null); const leftFoot = useRef<Mesh>(null); const rightFoot = useRef<Mesh>(null);
+  const body = useRef<Mesh>(null); const group = useRef<Group>(null); const puppet = useRef<Group>(null); const pelvis = useRef<Group>(null); const head = useRef<Group>(null); const stars = useRef<Group>(null);
+  const pose = useRef<Pose>(createPose()); const scratch = useRef<Pose>(createPose());
+  const input = useRef<import('./animation').PoseInput>({ time: 0, now: 0, moving: false, reduced: false });
+  Object.assign(input.current, { dead, winner, emote, until: emoteUntil === undefined ? undefined : emoteUntil + serverOffset, reduced: reducedMotion, social, phase, morphology: model.head, recipient });
+  const stage = physicalStage(social?.physical, Date.now() + serverOffset);
+  const status = stage === 'get_up' ? 'Reprend ses esprits' : stage === 'stunned_loop' || stage === 'stun_fall' ? 'À terre' : social && social.protectedUntil > Date.now() + serverOffset ? 'Protégé' : undefined;
   useFrame((state, dt) => {
     if (!group.current || !puppet.current) return;
-    const time = state.clock.elapsedTime; const moving = Math.abs(group.current.position.x - position[0]) + Math.abs(group.current.position.z - position[2]) > .08;
+    const moving = Math.abs(group.current.position.x - position[0]) + Math.abs(group.current.position.z - position[2]) > .08;
     group.current.position.x = MathUtils.damp(group.current.position.x, position[0], seated ? 4 : 14, dt); group.current.position.z = MathUtils.damp(group.current.position.z, position[2], seated ? 4 : 14, dt);
     const targetYaw = group.current.rotation.y + Math.atan2(Math.sin(yaw - group.current.rotation.y), Math.cos(yaw - group.current.rotation.y));
     group.current.rotation.y = MathUtils.damp(group.current.rotation.y, targetYaw, 9, dt);
-    const pose = avatarPose({ time, now: Date.now(), moving, dead, winner, emote, until: emoteUntil, reduced: reducedMotion });
-    puppet.current.position.y = MathUtils.damp(puppet.current.position.y, pose.y, 10, dt);
-    puppet.current.position.z = MathUtils.damp(puppet.current.position.z, pose.z, 10, dt);
-    puppet.current.rotation.z = MathUtils.damp(puppet.current.rotation.z, pose.roll, 6, dt);
-    puppet.current.rotation.y = MathUtils.damp(puppet.current.rotation.y, pose.yaw, 9, dt);
-    if (head.current) head.current.rotation.set(pose.headX, pose.headY, pose.headZ);
-    if (leftArm.current) leftArm.current.rotation.set(pose.leftX, 0, pose.leftZ);
-    if (rightArm.current) { rightArm.current.rotation.set(pose.rightX, 0, pose.rightZ); rightArm.current.scale.y = pose.rightScale; rightArm.current.position.y = 1 + pose.rightLift; }
-    if (leftFoot.current) leftFoot.current.rotation.x = pose.leftFoot;
-    if (rightFoot.current) rightFoot.current.rotation.x = pose.rightFoot;
-
-  });
+    input.current.time = state.clock.elapsedTime; input.current.now = Date.now() + serverOffset; input.current.moving = moving;
+    const p = avatarPose(input.current, pose.current, scratch.current);
+    const paired = !!social?.animation?.sharedInteractionId && !!partner && p.state === social.animation.kind;
+    const direction = paired ? Math.atan2(partner!.x - position[0], partner!.z - position[2]) - group.current.rotation.y : 0;
+    const toward = Math.atan2(Math.sin(direction), Math.cos(direction));
+    const pairOffset = paired && p.state === 'carry' && recipient ? .4 : paired && p.state === 'hug' ? .12 : 0;
+    puppet.current.position.y = MathUtils.damp(puppet.current.position.y, p.y, 12, dt);
+    puppet.current.position.x = MathUtils.damp(puppet.current.position.x, Math.sin(toward) * pairOffset, 12, dt);
+    puppet.current.position.z = MathUtils.damp(puppet.current.position.z, p.z + Math.cos(toward) * pairOffset, 12, dt);
+    puppet.current.rotation.set(MathUtils.damp(puppet.current.rotation.x, p.pitch, 12, dt), MathUtils.damp(puppet.current.rotation.y, p.yaw + toward, 12, dt), MathUtils.damp(puppet.current.rotation.z, p.roll, 12, dt));
+    if (body.current) body.current.scale.y = MathUtils.damp(body.current.scale.y, p.state === 'kneel' ? 1 - .15 * p.leftKnee / 2.85 : 1, 12, dt);
+    if (pelvis.current) pelvis.current.rotation.set(p.pelvisX, p.pelvisY, p.pelvisZ);
+    if (head.current) { head.current.rotation.set(p.headX, p.headY, p.headZ); head.current.position.z = MathUtils.damp(head.current.position.z, p.headForward, 18, dt); }
+    if (stars.current) { stars.current.visible = p.stars; stars.current.rotation.y = reducedMotion ? 0 : (input.current.now - (social?.physical?.startedAt ?? input.current.now)) / 500; }
+  }, -1);
   return <group ref={group} position={initialPosition.current} onClick={onClick ? event => { event.stopPropagation(); onClick(); } : undefined}>
-    {(speaking || selected) && <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .025, 0]}><ringGeometry args={[.7, .8, 32]} /><meshBasicMaterial color={speaking ? '#65B847' : '#F5E742'} /></mesh>}
+    {(speaking || selected) && <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .025, 0]}><ringGeometry args={[.7, .8, 24]} /><meshBasicMaterial color={speaking ? '#65B847' : '#F5E742'} /></mesh>}
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .015, 0]} scale={[.75, .5, 1]}><circleGeometry args={[1, 20]} /><meshBasicMaterial color="#191719" transparent opacity={.13} depthWrite={false} /></mesh>
-    <group ref={puppet} scale={dead ? .85 : 1}>
-      <mesh ref={leftFoot} position={[-.22, .16, .13]} scale={[.28, .3, .44]} geometry={avatarGeometry.box} material={avatarMaterial(ink)} dispose={null} /><mesh ref={rightFoot} position={[.22, .16, .13]} scale={[.28, .3, .44]} geometry={avatarGeometry.box} material={avatarMaterial(ink)} dispose={null} />
-      <mesh position={[0, .7, 0]} geometry={avatarGeometry.body} material={avatarMaterial(a.body)} dispose={null} />
-      {[-1, 1].map((side, i) => <group key={side} ref={i === 0 ? leftArm : rightArm} position={[side * .38, 1, 0]}><mesh position={[side * .08, -.28, 0]} rotation={[0, 0, side * .1]} geometry={avatarGeometry.arm} material={avatarMaterial(a.body)} dispose={null} /><Ball at={[side * .1, -.65, 0]} scale={[.13, .15, .13]} color={a.skin} /></group>)}
-      <group position={[0, 1.65, 0]} ref={head}>
-        <AvatarHead appearance={a} eliminated={dead} />
-      </group>
+    <group ref={puppet} name="avatar-puppet" scale={dead ? .85 : 1}>
+      <ArticulatedLeg side={-1} pose={pose} root={puppet} color={a.body} /><ArticulatedLeg side={1} pose={pose} root={puppet} color={a.body} />
+      <group ref={pelvis} position={[0, .45, 0]}><group position={[0, -.45, 0]}>
+        <mesh ref={body} position={[0, .7, 0]} geometry={avatarGeometry.body} material={avatarMaterial(a.body)} dispose={null} />
+        <ArticulatedArm side={-1} pose={pose} skin={a.skin} body={a.body} /><ArticulatedArm side={1} pose={pose} skin={a.skin} body={a.body} />
+        <group position={[0, 1.65, 0]} ref={head}><AvatarHead appearance={a} eliminated={dead} /></group>
+      </group></group>
+      <group ref={stars} visible={false} position={[0, 2.65, 0]}>{[0, 1, 2].map(n => <mesh key={n} position={[Math.cos(n * Math.PI * 2 / 3) * .7, .08 * n, Math.sin(n * Math.PI * 2 / 3) * .7]} rotation={[0, 0, Math.PI / 4]} scale={[.2, .2, .2]} geometry={starGeometry} material={avatarMaterial('#F5E742')} dispose={null} />)}</group>
     </group>
-    {name && <Html center position={[0, dead ? 2 : Math.max(2.9, 1.65 + model.top + .25), 0]} zIndexRange={[8, 1]} style={{ pointerEvents: 'none' }}><span className={`avatar-name ${selected ? 'self' : ''} ${speaking ? 'talking' : ''}`}><PlayerName name={name} mark={mark} />{speaking ? ' ♫' : ''}</span></Html>}
+    {name && <Html center position={[0, dead ? 2 : Math.max(2.9, 1.65 + model.top + .25), 0]} zIndexRange={[8, 1]} style={{ pointerEvents: 'none' }}><span className={`avatar-name ${selected ? 'self' : ''} ${speaking ? 'talking' : ''}`}><PlayerName name={name} mark={mark} />{speaking ? ' ♫' : ''}{status && <small className="social-status">{status}</small>}</span></Html>}
   </group>;
 }
