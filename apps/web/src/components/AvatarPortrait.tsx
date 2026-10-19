@@ -1,19 +1,28 @@
+import { memo, useMemo } from 'react';
 import type { AvatarAppearance } from '@rene/contracts';
-export function AvatarPortrait({ appearance: a, className = '', eliminated = false }: { appearance: AvatarAppearance; className?: string; eliminated?: boolean }) {
-  return <svg className={`portrait ${eliminated ? 'portrait-eliminated' : ''} ${className}`} viewBox="0 0 180 200" role="img" aria-label={eliminated ? "Portrait éliminé · yeux rouges" : "Votre drôle de tête"}>
-    <path d="M32 200 42 150 Q88 129 139 150 L151 200" fill={a.body} stroke="#191719" strokeWidth="3" />
-    <g transform={a.head === 'bean' ? 'rotate(-8 90 95)' : undefined}>
-      <path d={a.head === 'square' ? 'M44 34 Q86 20 130 37 L137 131 Q133 157 104 155 L50 151 Q30 151 32 125 L29 57 Q29 35 44 34' : a.head === 'bean' ? 'M112 24 Q154 38 136 83 Q167 130 112 151 Q42 179 30 111 Q15 74 53 54 Q72 6 112 24' : 'M82 21 Q125 21 125 65 Q168 134 117 157 Q50 173 29 133 Q14 110 44 68 Q49 19 82 21'} fill={a.skin} stroke="#191719" strokeWidth="3" />
-      {a.hair === 'tuft' && <path d="M57 42 Q39 -2 73 14 L83 34 Q80 -3 105 13 L107 39" fill={a.hairColor} />}
-      {a.hair === 'flat' && <path d="M37 48 Q25 8 80 18 Q139 4 141 60 L116 57 118 39 56 43 51 65Z" fill={a.hairColor} />}
-      {a.hair === 'spikes' && <path d="M38 51 35 11 60 34 70 1 84 31 109 3 114 35 143 22 129 60Z" fill={a.hairColor} />}
-      {[61, 114].map((x, i) => <g key={x}><ellipse cx={x} cy={79 + i * 3} rx={a.eyes === 'tiny' ? 8 : 16} ry={a.eyes === 'sleepy' ? 8 : 20} fill={eliminated ? "#F34531" : "#F5F2EA"} stroke="#191719" strokeWidth="2" /><ellipse cx={x + 3} cy={81 + i * 3} rx="4" ry="6" fill="#191719" /></g>)}
-      {eliminated && <path d="M46 59 74 67 M101 67 128 57" fill="none" stroke="#191719" strokeWidth="5" strokeLinecap="round" />}
-      <path d={a.nose === 'long' ? 'M87 79 109 119 74 116' : a.nose === 'round' ? 'M83 92 Q112 91 105 112 Q86 125 78 109Z' : 'M88 101 95 109 85 109'} fill="#F34531" stroke="#191719" strokeWidth="2" strokeLinejoin="round" />
-      {a.mouth === 'surprised' ? <ellipse cx="91" cy="133" rx="6" ry="9" fill="#191719" /> : <path d={a.mouth === 'smile' ? 'M69 126 Q91 149 112 125' : 'M78 132 103 130'} fill="none" stroke="#191719" strokeWidth="4" strokeLinecap="round" />}
-      {a.accessory === 'glasses' && <g fill="none" stroke="#191719" strokeWidth="5"><ellipse cx="60" cy="82" rx="25" ry="28" /><ellipse cx="118" cy="83" rx="24" ry="27" /><path d="M85 78 93 78" /></g>}
-      {a.accessory === 'hat' && <g fill="#65B847" stroke="#191719" strokeWidth="3"><path d="M67 33 64 0 110 0 116 32Z" /><ellipse cx="88" cy="33" rx="49" ry="10" /></g>}
-      {a.accessory === 'moustache' && <path d="M89 117 Q58 108 57 137 Q72 134 88 126 Q106 140 125 130 Q118 105 89 117" fill="#191719" />}
-    </g>
-  </svg>;
+import { avatarTone, buildAvatarModel } from '../avatar/model';
+import type { Part } from '../avatar/parts';
+
+function PartSvg({ part: p, appearance, eliminated }: { part: Part; appearance: AvatarAppearance; eliminated: boolean }) {
+  const sx = p.scale[0] * 83; const sy = p.scale[1] * 83;
+  const color = avatarTone(p.tone, appearance, eliminated);
+  return <g transform={`translate(${90 + p.at[0] * 83} ${90 - p.at[1] * 83}) rotate(${-(p.tilt ?? 0) * 180 / Math.PI})`} fill={color} stroke={p.tone === 'ink' ? 'none' : '#191719'} strokeWidth={p.tone === 'eye' ? 2 : 1.3} strokeLinejoin="round">
+    {p.kind === 'sphere' && <ellipse rx={sx} ry={sy} />}
+    {p.kind === 'box' && <rect x={-sx / 2} y={-sy / 2} width={sx} height={sy} rx="1" />}
+    {p.kind === 'cone' && <path d={`M0 ${-sy / 2} ${sx} ${sy / 2} ${-sx} ${sy / 2}Z`} />}
+    {p.kind === 'cylinder' && <path d={`M${-sx} ${-sy / 2} Q0 ${-sy / 2 - 3} ${sx} ${-sy / 2} L${sx} ${sy / 2} Q0 ${sy / 2 + 3} ${-sx} ${sy / 2}Z`} />}
+    {p.kind === 'torus' && (p.arc === Math.PI ? <path d={`M${sx} 0 A${sx} ${sy} 0 0 0 ${-sx} 0`} fill="none" stroke={color} strokeWidth={Math.max(2.5, sx * .26)} strokeLinecap="round" /> : <ellipse rx={sx} ry={sy} fill="none" stroke={color} strokeWidth={Math.max(2.5, sx * .26)} />)}
+  </g>;
 }
+export const AvatarPortrait = memo(function AvatarPortrait({ appearance: a, className = '', eliminated = false }: { appearance: AvatarAppearance; className?: string; eliminated?: boolean }) {
+  const model = useMemo(() => buildAvatarModel(a, eliminated), [a, eliminated]);
+  const minY = Math.min(0, Math.floor(90 - model.top * 83 - 8));
+  const features = [...model.eyes, ...model.mouth, ...model.nose, ...model.accessory].sort((a, b) => a.at[2] - b.at[2]);
+  const renderPart = (p: Part, i: number) => <PartSvg key={i} part={p} appearance={a} eliminated={eliminated} />;
+  return <svg className={`portrait ${eliminated ? 'portrait-eliminated' : ''} ${className}`} viewBox={`0 ${minY} 180 ${200 - minY}`} role="img" aria-label={eliminated ? 'Portrait éliminé · yeux rouges' : 'Votre drôle de tête'} data-appearance={[a.head, a.hair, a.eyes, a.mouth, a.nose, a.accessory].join(':')}>
+    <path d="M32 200 42 150 Q88 129 139 150 L151 200" fill={a.body} stroke="#191719" strokeWidth="3" />
+    <path d={model.head.path} fill={a.skin} stroke="#191719" strokeWidth="3" strokeLinejoin="round" />
+    {model.hair.map(renderPart)}
+    {features.map(renderPart)}
+  </svg>;
+});

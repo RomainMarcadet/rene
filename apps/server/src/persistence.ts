@@ -23,11 +23,11 @@ class MemoryPersistence implements Persistence {
 
   async getGuest(tokenHash: string): Promise<Guest | null> {
     const guest = this.guests.get(tokenHash);
-    return guest ? structuredClone(guest) : null;
+    return guest ? { ...structuredClone(guest), appearance: AppearanceSchema.parse(guest.appearance) } : null;
   }
 
   async saveGuest(guest: Guest): Promise<void> {
-    this.guests.set(guest.tokenHash, structuredClone(guest));
+    this.guests.set(guest.tokenHash, { ...structuredClone(guest), appearance: AppearanceSchema.parse(guest.appearance) });
   }
 
   async recordResult(id: string, roomSessionId: string, result: GameResult): Promise<void> {

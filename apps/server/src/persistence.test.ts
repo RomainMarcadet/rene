@@ -35,6 +35,18 @@ describe('guest persistence boundaries', () => {
     expect(await persistence.getGuest(guest().tokenHash)).toBeNull();
   });
 
+  it('normalizes legacy stored appearances and round-trips the expanded profile', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    const persistence = await createPersistence(); const original = guest();
+    const { accessoryColor: _color, ...legacy } = original.appearance;
+    await persistence.saveGuest({ ...original, appearance: legacy as typeof original.appearance });
+    expect((await persistence.getGuest(original.tokenHash))?.appearance).toEqual(DEFAULT_APPEARANCE);
+    const expanded = { ...original, appearance: { ...DEFAULT_APPEARANCE, head: 'mushroom' as const, hair: 'buns' as const, eyes: 'uneven' as const, mouth: 'tongue' as const, nose: 'snout' as const, accessory: 'flower' as const, accessoryColor: '#8A5DB3' as const } };
+    await persistence.saveGuest(expanded);
+    expect((await persistence.getGuest(original.tokenHash))?.appearance).toEqual(expanded.appearance);
+    await persistence.close();
+  });
+
   it('refuses to lose production data through an implicit memory fallback', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     await expect(createPersistence()).rejects.toThrow('DATABASE_URL');

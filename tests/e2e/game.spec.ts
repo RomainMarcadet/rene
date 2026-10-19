@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { joinFour, showPanel } from './helpers';
+import { joinFour, showPanel, submitDescription } from './helpers';
 
 async function pose(page: Page, name: string) {
   return page.evaluate(async name => {
@@ -52,10 +52,7 @@ test('four independent browsers finish a game, reconnect and prepare a replay', 
           else await expect(page.getByLabel('Votre indice', { exact: true })).toHaveCount(0);
         }));
         if (cycle === 0 && turn === 0) await pages[speaker].screenshot({ path: 'output/playwright/active-turn.png', fullPage: true });
-        const input = pages[speaker].getByLabel('Votre indice', { exact: true });
-        await input.fill(`Indice ${cycle + 1} ${speaker + 1}`);
-        await pages[speaker].getByRole('button', { name: /Valider mon indice/ }).click();
-        await expect(input).not.toBeVisible();
+        await submitDescription(pages[speaker], `Indice ${cycle + 1} ${speaker + 1}`, pages);
       }
       for (const page of pages) {
         await expect(page.locator('.latest-clue')).toContainText(`Indice ${cycle + 1}`);

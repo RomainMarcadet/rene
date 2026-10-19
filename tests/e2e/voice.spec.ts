@@ -1,5 +1,5 @@
 import { test, expect, type Browser, type Page } from '@playwright/test';
-import { setMicrophoneMode, showPanel, voiceSettings } from './helpers';
+import { setMicrophoneMode, showPanel, submitDescription, voiceSettings } from './helpers';
 
 test.skip(process.env.RENE_VOICE_E2E !== '1', 'Requires the local LiveKit service (RENE_VOICE_E2E=1).');
 test.use({ launchOptions: { args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'] } });
@@ -184,8 +184,7 @@ test('eliminated players keep receiving audio after the server rotates voice per
         for (const [index, page] of pages.entries()) if (await page.getByLabel('Votre indice', { exact: true }).isVisible()) return speaker = index;
         return -1;
       }).not.toBe(-1);
-      await pages[speaker].getByLabel('Votre indice', { exact: true }).fill(`Indice discret ${n}`);
-      await pages[speaker].getByRole('button', { name: /Valider mon indice/ }).click();
+      await submitDescription(pages[speaker], `Indice discret ${n}`, pages);
     }
     await pages[0].getByRole('button', { name: /Passer au vote/ }).click();
     for (const [index, page] of pages.entries()) await page.getByRole('button', { name: `Voter pour ${names[index === 1 ? 0 : 1]}`, exact: true }).click();

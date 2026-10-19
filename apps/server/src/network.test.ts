@@ -56,6 +56,21 @@ async function expire(running: Running, room: ReturnType<Running['rooms']['requi
 }
 
 describe('real Socket.IO clients', () => {
+  it('broadcasts expanded appearances, persists them and normalizes legacy profile commands on reconnect', async () => {
+    const { running, url, actors } = await opened();
+    const appearance = { ...DEFAULT_APPEARANCE, head: 'peanut' as const, hair: 'curls' as const, eyes: 'worried' as const, mouth: 'tooth' as const, nose: 'hook' as const, accessory: 'monocle' as const, accessoryColor: '#8A5DB3' as const };
+    expect((await send(actors[1], { type: 'profile.update', name: 'René nouveau', appearance })).ok).toBe(true);
+    await expect.poll(() => actors.map(a => a.snapshot?.players.find(p => p.id === actors[1].playerId)?.appearance)).toEqual(Array(4).fill(appearance));
+    const session = await running.app.inject({ method: 'GET', url: '/api/session', headers: { cookie: actors[1].cookie } });
+    expect(session.json().appearance).toEqual(appearance);
+    const old = actors[1]; old.socket.disconnect(); const resumed = await actor(running, url, old);
+    await send(resumed, { type: 'room.resume' });
+    await expect.poll(() => resumed.snapshot?.players.find(p => p.id === old.playerId)?.appearance).toEqual(appearance);
+    const { accessoryColor: _color, ...legacy } = DEFAULT_APPEARANCE;
+    expect((await send(resumed, { type: 'profile.update', name: 'René ancien', appearance: legacy } as unknown as Command)).ok).toBe(true);
+    await expect.poll(() => actors[0].snapshot?.players.find(p => p.id === old.playerId)?.appearance).toEqual(DEFAULT_APPEARANCE);
+    expect((await send(resumed, { type: 'profile.update', name: 'René invalide', appearance: { ...appearance, head: 'hacked' } } as unknown as Command)).ok).toBe(false);
+  });
   it('accepts authenticated polling without Origin or Fetch Metadata on the configured host', async () => {
     const { running, url } = await server(undefined, true);
     const session = await running.app.inject({ method: 'GET', url: '/api/session' });

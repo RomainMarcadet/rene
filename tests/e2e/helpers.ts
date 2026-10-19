@@ -1,10 +1,11 @@
 import { expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
 
-export async function joinFour(browser: Browser, baseURL: string, mobileIndex = -1) {
+export async function joinFour(browser: Browser, baseURL: string, mobileIndex = -1, beforeConnect?: (context: BrowserContext, index: number) => Promise<void>) {
   const contexts: BrowserContext[] = [];
   const pages: Page[] = [];
   for (let i = 0; i < 4; i++) {
     const context = await browser.newContext({ baseURL, ...(i === mobileIndex ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : {}) }); contexts.push(context);
+    await beforeConnect?.(context, i);
     pages.push(await context.newPage());
   }
   await pages[0].goto('/'); await pages[0].getByLabel('Pseudonyme').fill('Camille');
@@ -20,6 +21,16 @@ export async function joinFour(browser: Browser, baseURL: string, mobileIndex = 
     await expect(pages[i].locator('.participants > li')).toHaveCount(i + 1);
   }
   return { contexts, pages, names };
+}
+
+/** A DOM click finishes before Socket.IO confirms the command and React changes turns. */
+export async function submitDescription(page: Page, text: string, observers: readonly Page[] = [page]) {
+  const input = page.getByLabel('Votre indice', { exact: true });
+  await input.fill(text);
+  await page.getByRole('button', { name: /Valider mon indice/ }).click();
+  await expect(input).toHaveCount(0);
+  // Also reject a vanished form caused by expiry instead of an accepted contribution.
+  await Promise.all(observers.map(observer => expect(observer.locator('.latest-clue')).toContainText(text)));
 }
 
 export async function showPanel(page: Page, panel: 'Suspects' | 'Indices' | 'Discussion') {
