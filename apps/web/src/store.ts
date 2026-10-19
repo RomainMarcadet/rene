@@ -23,7 +23,8 @@ async function fetchSession(): Promise<Session> {
   try {
     const response = await fetch('/api/session', { credentials: 'same-origin', signal: controller.signal });
     if (!response.ok) throw new Error('Le salon est injoignable. Réessayez dans un instant.');
-    return await response.json();
+    const session = await response.json() as Session;
+    return { ...session, appearance: AppearanceSchema.parse(session.appearance) };
   } finally { clearTimeout(timeout); }
 }
 function scheduleRetry() {

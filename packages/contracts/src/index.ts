@@ -1,14 +1,6 @@
 import { z } from 'zod';
-
-export const COLORS = ['#EE89BA', '#F34531', '#F5E742', '#65B847', '#087BA0', '#191719', '#F5F2EA'] as const;
-export const AppearanceSchema = z.object({
-  head: z.enum(['pear', 'square', 'bean']), skin: z.enum(COLORS), body: z.enum(COLORS),
-  hair: z.enum(['none', 'tuft', 'flat', 'spikes']), hairColor: z.enum(COLORS),
-  eyes: z.enum(['wide', 'sleepy', 'tiny']), nose: z.enum(['round', 'long', 'small']),
-  mouth: z.enum(['flat', 'smile', 'surprised']), accessory: z.enum(['none', 'glasses', 'hat', 'moustache']),
-}).strict();
-export type AvatarAppearance = z.infer<typeof AppearanceSchema>;
-export const DEFAULT_APPEARANCE: AvatarAppearance = { head: 'pear', skin: '#EE89BA', body: '#087BA0', hair: 'tuft', hairColor: '#191719', eyes: 'wide', nose: 'long', mouth: 'flat', accessory: 'glasses' };
+import { AppearanceSchema, type AvatarAppearance } from './appearance.js';
+export * from './appearance.js';
 export const SettingsSchema = z.object({
   automaticRoles: z.boolean(), undercoverCount: z.number().int().min(0).max(10), whiteCount: z.number().int().min(0).max(10),
   descriptionSeconds: z.number().int().min(10).max(180), discussionSeconds: z.number().int().min(15).max(600),
