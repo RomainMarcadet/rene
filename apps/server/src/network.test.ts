@@ -307,12 +307,14 @@ describe('real Socket.IO clients', () => {
     const { running, url, actors, room } = await opened();
     const [a, b] = actors; room.players.get(a.playerId)!.position = { x: 4, z: 0, yaw: 0 }; room.players.get(b.playerId)!.position = { x: 4, z: 1.2, yaw: Math.PI };
     const command = { type: 'player.attack', kind: 'punch', targetId: b.playerId } as const;
+    let privateMessages = 0; b.socket.on('private', () => { privateMessages++; });
     const duplicate = crypto.randomUUID();
     expect((await send(a, command, { id: duplicate })).ok).toBe(true);
     expect((await send(a, command, { id: duplicate, phaseId: crypto.randomUUID() })).ok).toBe(true);
     await new Promise(resolve => setTimeout(resolve, 200)); running.tick();
     await expect.poll(() => b.snapshot?.social.players[b.playerId].physical?.kind).toBe('hit_reaction');
     expect(room.players.get(b.playerId)!.social.hits).toHaveLength(1);
+    expect(privateMessages).toBe(0);
     const attack = a.snapshot!.social.players[a.playerId].animation;
     a.socket.disconnect(); const resumed = await actor(running, url, a); await send(resumed, { type: 'room.resume' });
     await expect.poll(() => resumed.snapshot?.social.players[a.playerId].animation?.instanceId).toBe(attack!.instanceId);
@@ -343,6 +345,24 @@ describe('real Socket.IO clients', () => {
     expect((await business).ok).toBe(true);
     expect((await Promise.all(spam)).filter(a => !a.ok).length).toBeGreaterThan(0);
     expect(room.game!.descriptions.at(-1)?.text).toBe('Indice fictif prioritaire');
+    while (room.game!.phase === 'description') {
+      const turn = actors.find(a => a.playerId === room.game!.turnPlayerId)!;
+      expect((await send(turn, { type: 'game.describe', text: 'Indice fictif suivant' }, { phaseId: room.game!.phaseId })).ok).toBe(true);
+    }
+    expect((await send(actors[0], { type: 'game.skipDiscussion' }, { phaseId: room.game!.phaseId })).ok).toBe(true);
+    const invalidEmotes = Array.from({ length: 40 }, () => send(first, { type: 'player.emote', kind: 'wave' }));
+    expect((await send(first, { type: 'game.vote', targetId: actors.find(a => a !== first)!.playerId }, { phaseId: room.game!.phaseId })).ok).toBe(true);
+    await Promise.all(invalidEmotes);
+    expect(room.game!.ballots[first.playerId]).toBeTruthy();
+  });
+
+  it('retains the global attack delay even through voluntary leave and rejoin', async () => {
+    const { actors, code } = await opened(); const a = actors[0];
+    expect((await send(a, { type: 'player.attack', kind: 'punch' })).ok).toBe(true);
+    expect((await send(a, { type: 'room.leave' })).ok).toBe(true);
+    expect((await send(a, { type: 'room.join', code, name: 'Retour fictif', appearance: DEFAULT_APPEARANCE })).ok).toBe(true);
+    const ack = await send(a, { type: 'player.attack', kind: 'headbutt' });
+    expect(ack.ok).toBe(false); if (!ack.ok) expect(ack.error).toContain('souffle');
   });
 
 });

@@ -19,6 +19,7 @@ describe('social wire contracts', () => {
     expect(withinSocialReach(a, { ...a, z: 1.85 })).toBe(true);
     expect(withinSocialReach(a, { ...a, z: 1.85001 })).toBe(false);
     expect(withinSocialReach(a, { ...a, z: -1 })).toBe(false);
+    expect(withinSocialReach({ x: 1.7, z: 1, yaw: -Math.PI / 4 }, { x: 1.5, z: 1.2, yaw: 0 })).toBe(false);
     expect(clearSocialPath({ x: -1.7, z: 0, yaw: 0 }, { x: 1.7, z: 0, yaw: 0 })).toBe(false);
     expect(clearSocialPath({ x: 4, z: 0, yaw: 0 }, { x: 4, z: 1, yaw: 0 })).toBe(true);
   });

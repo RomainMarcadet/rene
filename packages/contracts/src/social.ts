@@ -5,7 +5,7 @@ export const SOCIAL_COMBAT_CONFIG = {
   attackCooldownMs: 800, attackDurationMs: 500, impactDelayMs: 180, hitReactionMs: 220,
   hitWindowMs: 8000, hitsToStun: 5, stunnedMs: 2500, recoveryMs: 500,
   postRecoveryProtectionMs: 3000, range: 1.85, facingCosine: .5, fallMs: 350,
-  invitationMs: 8000, interactionRange: 2.1,
+  invitationMs: 8000, interactionRange: 2.1, consentRange: 1.45,
 } as const;
 export const MACARENA_BEAT_MS = 600;
 export const MACARENA_MEASURE_MS = MACARENA_BEAT_MS * 16;
@@ -30,7 +30,7 @@ export interface AnimationDefinition {
   interrupts: readonly ('vote' | 'context' | 'impact' | 'stop' | 'movement' | 'departure')[];
   reducedMotion: 'static-pose' | 'gentle-transition';
 }
-const definition = (label: string, category: AnimationCategory, durationMs: number, loop = false, moving = false, trigger: AnimationDefinition['trigger'] = 'individual', bodyParts: AnimationDefinition['bodyParts'] = ['head', 'arms', 'hands', 'pelvis', 'legs']): AnimationDefinition => ({ label, category, durationMs, loop, moving, trigger, bodyParts, interrupts: ['vote', 'context', 'impact', 'stop', 'departure', ...(!moving ? ['movement' as const] : [])], reducedMotion: loop ? 'static-pose' : 'gentle-transition' });
+const definition = (label: string, category: AnimationCategory, durationMs: number, loop = false, moving = false, trigger: AnimationDefinition['trigger'] = 'individual', bodyParts: AnimationDefinition['bodyParts'] = ['head', 'arms', 'hands', 'pelvis', 'legs']): AnimationDefinition => ({ label, category, durationMs, loop, moving, trigger, bodyParts, interrupts: ['vote', 'context', 'impact', 'stop', 'departure', ...(!moving && trigger !== 'consent' ? ['movement' as const] : [])], reducedMotion: loop ? 'static-pose' : 'gentle-transition' });
 export const ANIMATIONS: Record<AnimationId, AnimationDefinition> = {
   wave: definition('Salut', 'Gestes', 3500, false, true), dance: definition('Danse', 'Danses', 2500, false, true), suspect: definition('Soupçon', 'Gestes', 3500, false, true),
   play_dead: definition('Faire le mort', 'Postures', 7000), straddle: definition('À califourchon', 'Postures', 10000, true), kneel: definition('À genoux', 'Postures', 6000),

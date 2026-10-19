@@ -95,7 +95,7 @@ export function handleSocial(room: Room, p: Player, command: Command, now: numbe
   }
   if (command.type === 'player.interaction.invite') {
     const target = room.players.get(command.targetId);
-    check(target && target.id !== p.id && allowed(room, target) && target.social.acceptsPhysical && socialMovementAllowed(target.social, now) && withinSocialReach(p.position, target.position, C.interactionRange, false), 'Ce voisin n’est pas disponible pour une invitation.');
+    check(target && target.id !== p.id && allowed(room, target) && target.social.acceptsPhysical && socialMovementAllowed(target.social, now) && withinSocialReach(p.position, target.position, C.consentRange, false), 'Ce voisin n’est pas disponible pour une invitation.');
     check(!busy(room, p.id) && !busy(room, target!.id), 'Une interaction est déjà proposée à ce joueur.');
     check(room.social.interactions.size < 6, 'Trop d’interactions en cours.');
     const i: SharedInteraction = { id: randomUUID(), kind: command.kind, fromId: p.id, toId: target!.id, state: 'invited', expiresAt: now + C.invitationMs, startedAt: null };
@@ -106,7 +106,7 @@ export function handleSocial(room: Room, p: Player, command: Command, now: numbe
     check(i && i.toId === p.id && i.state === 'invited' && now < i.expiresAt, 'Cette invitation est terminée.');
     if (!command.accept) { endInteraction(room, i!); return; }
     const from = room.players.get(i!.fromId);
-    check(from && allowed(room, from) && from.social.acceptsPhysical && socialMovementAllowed(from.social, now) && withinSocialReach(from.position, p.position, C.interactionRange, false), 'Le voisin s’est éloigné ou n’est plus disponible.');
+    check(from && allowed(room, from) && from.social.acceptsPhysical && socialMovementAllowed(from.social, now) && withinSocialReach(from.position, p.position, C.consentRange, false), 'Le voisin s’est éloigné ou n’est plus disponible.');
     // Both halves start in the same serialized mutation. No world position is changed.
     i!.state = 'active'; i!.startedAt = now; i!.expiresAt = now + ANIMATIONS[i!.kind].durationMs;
     for (const actor of [from!, p]) { room.social.pending.delete(actor.id); delete actor.emote; actor.social.animation = { ...instance(i!.kind, now, actor.id === p.id ? from!.id : p.id), sharedInteractionId: i!.id }; }
@@ -119,7 +119,7 @@ export function tickSocial(room: Room, now: number) {
   let changed = false;
   for (const i of [...room.social.interactions.values()]) {
     const a = room.players.get(i.fromId); const b = room.players.get(i.toId);
-    if (now >= i.expiresAt || !allowed(room, a) || !allowed(room, b) || !a!.social.acceptsPhysical || !b!.social.acceptsPhysical || !withinSocialReach(a!.position, b!.position, C.interactionRange, false)) { endInteraction(room, i); changed = true; }
+    if (now >= i.expiresAt || !allowed(room, a) || !allowed(room, b) || !a!.social.acceptsPhysical || !b!.social.acceptsPhysical || !withinSocialReach(a!.position, b!.position, C.consentRange, false)) { endInteraction(room, i); changed = true; }
   }
   for (const [key, attack] of room.social.pending) {
     if (now < attack.at) continue;

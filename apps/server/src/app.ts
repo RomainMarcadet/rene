@@ -6,7 +6,7 @@ import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
 import staticFiles from '@fastify/static';
 import { Server, type Socket } from 'socket.io';
-import { DEFAULT_APPEARANCE, isSocialCommand, EnvelopeSchema, MoveSchema, type Ack, type ClientEvents, type ServerEvents } from '@rene/contracts';
+import { DEFAULT_APPEARANCE, SOCIAL_COMBAT_CONFIG, isSocialCommand, EnvelopeSchema, MoveSchema, type Ack, type ClientEvents, type ServerEvents } from '@rene/contracts';
 import { createPersistence, type Persistence, type Guest } from './persistence.js';
 import { readConfig, type Config } from './config.js';
 import { Rooms, MemoryRoomStore, type Room } from './rooms.js';
@@ -30,7 +30,7 @@ export async function createApp(options: AppOptions = {}) {
   const players = new Map<string, GameSocket>();
   const recent = new Map<string, Map<string, { fingerprint: string; ack: Ack }>>();
   const recentAt = new Map<string, number>();
-  const budgets = new Map<string, { business: TokenBucket; social: TokenBucket; total: TokenBucket; at: number }>();
+  const budgets = new Map<string, { business: TokenBucket; social: TokenBucket; total: TokenBucket; at: number; nextAttackAt: number }>();
   const globalSocial = new TokenBucket(240, 120);
   const globalBusiness = new TokenBucket(1000, 500);
   const voice = new VoiceService(config, error => app.log.warn({ err: error }, 'Vocal : nettoyage différé'));
@@ -111,7 +111,7 @@ export async function createApp(options: AppOptions = {}) {
     // Replace first so the old disconnect handler cannot mark the new connection offline.
     players.set(guest.id, socket);
     if (previous && previous.id !== socket.id) { previous.emit('replaced'); previous.disconnect(true); }
-    const budget = budgets.get(guest.id) ?? { business: new TokenBucket(30, 8), social: new TokenBucket(6, 3), total: new TokenBucket(120, 40), at: Date.now() };
+    const budget = budgets.get(guest.id) ?? { business: new TokenBucket(30, 8), social: new TokenBucket(6, 3), total: new TokenBucket(120, 40), at: Date.now(), nextAttackAt: 0 };
     budgets.set(guest.id, budget);
     const invalid = new TokenBucket(8, 2);
     const moves = new TokenBucket(30, 20);
@@ -179,7 +179,9 @@ export async function createApp(options: AppOptions = {}) {
               await persistence.saveGuest(guest).catch(error => { app.log.error({ err: error }, 'Profil'); throw new Error('Impossible de sauvegarder ton profil pour le moment.'); }); break;
             default:
               if (!room) throw new Error('Rejoins une salle pour continuer.');
+              if (command.type === 'player.attack' && now < budget.nextAttackAt) throw new Error('Laisse ton avatar reprendre son souffle.');
               await rooms.command(room, guest.id, command, now, envelope.socialGeneration);
+              if (command.type === 'player.attack') budget.nextAttackAt = now + SOCIAL_COMBAT_CONFIG.attackCooldownMs;
           }
           if (room && room.revision !== priorRevision) broadcast(room, !social);
           return { ok: true, ...(room ? { code: room.code } : {}) };

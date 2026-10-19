@@ -221,4 +221,27 @@ describe('ephemeral authoritative social engine', () => {
     expect(f.b.social.hits).toEqual([]); expect(f.b.social.physical).toBeUndefined(); expect(f.room.social.pending.size).toBe(0);
   });
 
+  it('uses different social generations across salons and ignores ordinary room revisions', async () => {
+    const f = await fixture(); const g = await fixture();
+    const generation = f.room.social.generation;
+    expect(g.room.social.generation).not.toBe(generation);
+    await f.act('p0', { type: 'chat.send', text: 'Message fictif' });
+    expect(f.room.social.generation).toBe(generation);
+    await expect(g.act('p0', { type: 'player.emote', kind: 'wave' }, T, generation)).rejects.toThrow('contexte');
+    expect(g.a.social.animation).toBeUndefined();
+  });
+  it('refuses a proposal without starting poses and never resumes a pair after disconnect', async () => {
+    const f = await fixture();
+    await f.act('p0', { type: 'player.interaction.invite', kind: 'hug', targetId: 'p1' });
+    let i = [...f.room.social.interactions.values()][0];
+    await f.act('p1', { type: 'player.interaction.respond', interactionId: i.id, accept: false });
+    expect(f.room.social.interactions.size).toBe(0); expect(f.a.social.animation).toBeUndefined();
+    await f.act('p0', { type: 'player.interaction.invite', kind: 'carry', targetId: 'p1' });
+    i = [...f.room.social.interactions.values()][0];
+    await f.act('p1', { type: 'player.interaction.respond', interactionId: i.id, accept: true });
+    f.rooms.disconnected(f.room, 'p1', T + 500);
+    expect(f.room.social.interactions.size).toBe(0); expect(f.a.social.animation).toBeUndefined(); expect(f.b.social.animation).toBeUndefined();
+    f.rooms.connected(f.room, 'p1', T + 600); expect(f.b.social.animation).toBeUndefined();
+  });
+
 });
