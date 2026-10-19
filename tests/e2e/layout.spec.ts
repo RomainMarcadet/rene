@@ -2,6 +2,8 @@ import { test, expect, type Page } from '@playwright/test';
 import { io, type Socket } from 'socket.io-client';
 import { DEFAULT_APPEARANCE, type Ack, type Command, type RoomSnapshot } from '@rene/contracts';
 import { showPanel } from './helpers';
+import { AVATAR_SPECIMENS } from '../../apps/web/src/avatar/specimens';
+import { avatarScene } from './avatarScene';
 
 async function inViewport(page: Page, selector: string) {
   const rect = (await page.locator(selector).boundingBox())!; const size = page.viewportSize()!;
@@ -15,6 +17,7 @@ test('twelve real participants, bounded HUD at five sizes, persistent draft and 
   test.setTimeout(120000);
   await page.setViewportSize({ width: 1586, height: 992 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.addInitScript(appearance => localStorage.setItem('rene-profile', JSON.stringify({ name: 'Renée du salon', appearance })), AVATAR_SPECIMENS[0]);
   await page.goto('/'); await page.getByLabel('Pseudonyme').fill('Renée du salon');
   await page.getByRole('button', { name: /Créer un salon/ }).click();
   await expect(page.locator('.room-code')).toBeVisible();
@@ -34,11 +37,16 @@ test('twelve real participants, bounded HUD at five sizes, persistent draft and 
       const cookie = (await context.storageState()).cookies.map(c => `${c.name}=${c.value}`).join('; ');
       const client = io(baseURL!, { transports: ['websocket'], autoConnect: false, extraHeaders: { Cookie: cookie, Origin: baseURL! } }); clients.push(client);
       await new Promise<void>((resolve, reject) => { client.once('connect', resolve); client.once('connect_error', reject); client.connect(); });
-      expect((await send(client, { type: 'room.join', code, name: `Suspect bavard numéro ${i}`, appearance: { ...DEFAULT_APPEARANCE, skin: i % 2 ? '#EE89BA' : '#F5E742' } })).ok).toBe(true);
+      expect((await send(client, { type: 'room.join', code, name: `Suspect bavard numéro ${i}`, appearance: AVATAR_SPECIMENS[i] })).ok).toBe(true);
       expect((await send(client, { type: 'player.ready', ready: true })).ok).toBe(true);
     }
     await expect(page.locator('.participants li')).toHaveCount(12);
     await expect(page.locator('.lobby-capacity')).toHaveText('12/12');
+    await expect.poll(async () => (await avatarScene(page))?.names.length).toBe(12);
+    const metrics = (await avatarScene(page))!;
+    expect(metrics.calls).toBeLessThan(650);
+    console.log('Twelve-avatar scene metrics:', JSON.stringify(metrics));
+    await page.screenshot({ path: 'output/playwright/avatar-twelve-desktop.png' });
     for (let i = 0; i < 6; i++) expect((await send(clients[i], { type: 'chat.send', text: `${i} · ${'Une conversation qui prend ses aises. '.repeat(10)}` })).ok).toBe(true);
     await expect(page.locator('.chat-message')).toHaveCount(6);
     expect(await page.locator('.chat-messages').evaluate(node => node.scrollHeight > node.clientHeight)).toBe(true);
