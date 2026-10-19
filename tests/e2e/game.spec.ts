@@ -57,7 +57,15 @@ test('four independent browsers finish a game, reconnect and prepare a replay', 
       for (const page of pages) {
         await expect(page.locator('.latest-clue')).toContainText(`Indice ${cycle + 1}`);
         await expect(page.locator('.history-rounds section').first()).toHaveAttribute('aria-label', `Indices du tour ${cycle + 1}`);
-        expect(await page.locator('.history-rounds section').first().locator('li strong').allTextContents()).toEqual(seenTurns.slice(-alive.size));
+        expect(await page.locator('.current-round .player-name').allTextContents()).toEqual(seenTurns.slice(-alive.size));
+        if (cycle > 0) {
+          await showPanel(page, 'Indices');
+          await page.getByRole('button', { name: /Tours passés/ }).click();
+          const history = page.getByRole('dialog', { name: 'Les tours précédents' });
+          await expect(history.getByRole('region', { name: 'Indices du tour 1' })).toBeVisible();
+          expect(await history.locator('.player-name').allTextContents()).toEqual(seenTurns.slice(0, 4));
+          await page.keyboard.press('Escape'); await expect(history).toHaveCount(0);
+        }
       }
       if (cycle === 0) await walk(pages[0], pages[1], names[0]);
       await pages[0].getByRole('button', { name: /Passer au vote/ }).click();

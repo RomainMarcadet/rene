@@ -45,7 +45,7 @@ export function RoomView({ room }: { room: RoomSnapshot }) {
   }, [viewport.width, viewport.height, viewport.layout, drawer, expanded]);
   async function invite() { try { await navigator.clipboard.writeText(`${location.origin}/?room=${room.code}`); notify('Lien copié. À vous de réunir les suspects.'); } catch { setModal('invite'); } }
   function customize() { setAppearance(player.appearance); setName(player.name); setModal('avatar'); }
-  return <main ref={root} className={`room-page layout-${viewport.layout} ${drawer ? 'drawer-open' : ''} ${expanded ? 'chat-expanded' : ''}`} style={{ height: viewport.height, top: viewport.top, left: viewport.left, width: viewport.width }}>
+  return <main ref={root} className={`room-page layout-${viewport.layout} ${drawer ? 'drawer-open' : ''} ${drawer === 'clues' ? 'clues-open' : ''} ${room.game ? 'in-game' : ''} ${expanded ? 'chat-expanded' : ''}`} style={{ height: viewport.height, top: viewport.top, left: viewport.left, width: viewport.width }}>
     <section className="scene-panel" aria-label="Le salon 3D partagé">
       <SceneBoundary><Suspense fallback={<div className="scene-loading">On arrange les coussins…</div>}><Hub room={room} playerId={me} speaking={speaking} clearArea={clearArea} compact={viewport.layout === 'mobile'} controlsVisible={!drawer && !expanded} /></Suspense></SceneBoundary>
     </section>
@@ -55,7 +55,7 @@ export function RoomView({ room }: { room: RoomSnapshot }) {
     <div className="room-overlay">
       <div className="gameplay-zone" data-occluder><Gameplay room={room} /></div>
       <div id="room-suspects" className="suspects-zone" hidden={!showSuspects} data-occluder><Suspects room={room} onCustomize={customize} /></div>
-      <div id="room-clues" className="clues-zone" hidden={!showClues} data-occluder><DescriptionHistory game={room.game} players={room.players} visible={showClues} /></div>
+      <div id="room-clues" className="clues-zone" hidden={!showClues} data-occluder><DescriptionHistory key={room.game?.id ?? 'lobby'} game={room.game} players={room.players} visible={showClues} /></div>
       <Communication room={room} visible={showChat} onExpand={setExpanded} />
       <nav className="drawer-tabs" aria-label="Panneaux du salon" data-occluder>{([['suspects', 'Suspects'], ['clues', 'Indices'], ['discussion', 'Discussion']] as const).map(([tab, label]) => <button key={tab} aria-expanded={drawer === tab} aria-controls={tab === 'discussion' ? 'room-discussion' : `room-${tab}`} onClick={() => setDrawer(drawer === tab ? null : tab)}>{label}{tab === 'suspects' ? ` · ${room.players.length}` : tab === 'clues' && room.game?.descriptions.length ? ` · ${room.game.descriptions.length}` : ''}<span>{drawer === tab ? '⌄' : '⌃'}</span></button>)}</nav>
     </div>

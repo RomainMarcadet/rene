@@ -34,7 +34,7 @@ export async function submitDescription(page: Page, text: string, observers: rea
 }
 
 export async function showPanel(page: Page, panel: 'Suspects' | 'Indices' | 'Discussion') {
-  await expect(page.locator('.room-code')).toBeVisible();
+  await expect(page.locator('.room-page')).toBeVisible();
   const button = page.getByRole('navigation', { name: 'Panneaux du salon' }).getByRole('button', { name: new RegExp(`^${panel}`) });
   if (await button.isVisible() && await button.getAttribute('aria-expanded') !== 'true') await button.click();
 }

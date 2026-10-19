@@ -3,12 +3,13 @@ import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import { MathUtils, type Group, type Mesh } from 'three';
 import type { AvatarAppearance, Emote } from '@rene/contracts';
+import { PlayerName } from '../components/PlayerName';
 import { avatarPose } from './animation';
 import { AvatarHead, avatarGeometry, avatarMaterial } from '../avatar/PartMeshes';
 import { buildAvatarModel } from '../avatar/model';
 const ink = '#191719';
 function Ball({ at, scale = [1, 1, 1], color }: { at: [number, number, number]; scale?: [number, number, number]; color: string }) { return <mesh position={at} scale={scale} geometry={avatarGeometry.sphere} material={avatarMaterial(color)} dispose={null} />; }
-export function Avatar({ appearance: a, position = [0, 0, 0], yaw = 0, name, speaking, selected, dead, winner, emote, emoteUntil, onClick, seated = false, reducedMotion = false }: { appearance: AvatarAppearance; position?: [number, number, number]; yaw?: number; name?: string; speaking?: boolean; selected?: boolean; dead?: boolean; winner?: boolean; emote?: Emote; emoteUntil?: number; onClick?: () => void; seated?: boolean; reducedMotion?: boolean }) {
+export function Avatar({ appearance: a, position = [0, 0, 0], yaw = 0, name, mark, speaking, selected, dead, winner, emote, emoteUntil, onClick, seated = false, reducedMotion = false }: { appearance: AvatarAppearance; position?: [number, number, number]; yaw?: number; name?: string; mark?: number; speaking?: boolean; selected?: boolean; dead?: boolean; winner?: boolean; emote?: Emote; emoteUntil?: number; onClick?: () => void; seated?: boolean; reducedMotion?: boolean }) {
   const model = useMemo(() => buildAvatarModel(a, dead), [a, dead]);
   const initialPosition = useRef(position);
   const group = useRef<Group>(null); const puppet = useRef<Group>(null); const head = useRef<Group>(null); const leftArm = useRef<Group>(null); const rightArm = useRef<Group>(null); const leftFoot = useRef<Mesh>(null); const rightFoot = useRef<Mesh>(null);
@@ -41,6 +42,6 @@ export function Avatar({ appearance: a, position = [0, 0, 0], yaw = 0, name, spe
         <AvatarHead appearance={a} eliminated={dead} />
       </group>
     </group>
-    {name && <Html center position={[0, dead ? 2 : Math.max(2.9, 1.65 + model.top + .25), 0]} zIndexRange={[8, 1]} style={{ pointerEvents: 'none' }}><span className={`avatar-name ${selected ? 'self' : ''} ${speaking ? 'talking' : ''}`}>{name}{speaking ? ' ♫' : ''}</span></Html>}
+    {name && <Html center position={[0, dead ? 2 : Math.max(2.9, 1.65 + model.top + .25), 0]} zIndexRange={[8, 1]} style={{ pointerEvents: 'none' }}><span className={`avatar-name ${selected ? 'self' : ''} ${speaking ? 'talking' : ''}`}><PlayerName name={name} mark={mark} />{speaking ? ' ♫' : ''}</span></Html>}
   </group>;
 }

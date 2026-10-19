@@ -56,6 +56,36 @@ async function expire(running: Running, room: ReturnType<Running['rooms']['requi
 }
 
 describe('real Socket.IO clients', () => {
+  it('shares role-independent player marks and keeps them with the same appearance and opening seat after reconnect', async () => {
+    const { running, url, actors, room } = await opened(8);
+    const appearance = { ...DEFAULT_APPEARANCE, hair: 'bun' as const, body: '#F34531' as const };
+    expect((await send(actors[0], { type: 'profile.update', name: 'René distinct', appearance })).ok).toBe(true);
+    expect((await send(actors[0], { type: 'settings.update', settings: { ...room.settings, automaticRoles: false, undercoverCount: 1, whiteCount: 3 } })).ok).toBe(true);
+    for (const a of actors) expect((await send(a, { type: 'player.ready', ready: true })).ok).toBe(true);
+    expect((await send(actors[0], { type: 'game.start' })).ok).toBe(true);
+    await expect.poll(() => actors.every(a => !!a.snapshot?.game)).toBe(true);
+    const marks = { ...room.game!.playerMarks }; const order = [...room.game!.order];
+    expect(new Set(Object.values(marks)).size).toBe(8);
+    expect(room.game!.roles[order[0]]).not.toBe('white');
+    for (const a of actors) {
+      expect(a.snapshot!.game!.playerMarks).toEqual(marks);
+      expect(a.snapshot!.players.find(p => p.id === actors[0].playerId)!.appearance).toEqual(appearance);
+      expect(a.snapshot!.players.every(p => p.role === undefined)).toBe(true);
+      expect(a.snapshot!.game).not.toHaveProperty('roles');
+      expect(a.snapshot!.game).not.toHaveProperty('words');
+    }
+    const old = actors.find(a => a.playerId === order[0])!;
+    old.socket.disconnect();
+    await expect.poll(() => actors.find(a => a !== old)!.snapshot?.players.find(p => p.id === old.playerId)?.connected).toBe(false);
+    await expire(running, room, actors.find(a => a !== old)!);
+    expect(room.game!.order).toEqual(order); expect(room.game!.turnPlayerId).toBe(old.playerId);
+    const resumed = await actor(running, url, old);
+    expect((await send(resumed, { type: 'room.resume' })).ok).toBe(true);
+    await expect.poll(() => resumed.snapshot?.game?.playerMarks).toEqual(marks);
+    expect(resumed.snapshot!.game!.order).toEqual(order);
+    expect((await send(resumed, { type: 'game.describe', text: 'Indice après reconnexion' })).ok).toBe(true);
+    await expect.poll(() => actors.find(a => a !== old)!.snapshot?.game?.turnPlayerId).toBe(order[1]);
+  });
   it('broadcasts expanded appearances, persists them and normalizes legacy profile commands on reconnect', async () => {
     const { running, url, actors } = await opened();
     const appearance = { ...DEFAULT_APPEARANCE, head: 'peanut' as const, hair: 'curls' as const, eyes: 'worried' as const, mouth: 'tooth' as const, nose: 'hook' as const, accessory: 'monocle' as const, accessoryColor: '#8A5DB3' as const };

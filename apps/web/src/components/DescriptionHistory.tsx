@@ -1,33 +1,31 @@
-import { useEffect, useRef } from 'react';
+import { useState } from 'react';
 import type { Description, PublicGame, PublicPlayer } from '@rene/contracts';
 import { AvatarPortrait } from './AvatarPortrait';
+import { PlayerName } from './PlayerName';
+import { Modal } from './Modal';
 
-export function DescriptionHistory({ game, players, visible }: { game: PublicGame | null; players: PublicPlayer[]; visible: boolean }) {
-  const list = useRef<HTMLDivElement>(null); const current = useRef<HTMLElement>(null);
+export function DescriptionHistory({ game, players }: { game: PublicGame | null; players: PublicPlayer[]; visible: boolean }) {
+  const [historyOpen, setHistoryOpen] = useState(false);
   const descriptions = game?.descriptions ?? [];
-  useEffect(() => {
-    if (!visible || !list.current) return;
-    list.current.scrollTop = 0;
-    current.current?.querySelector('[data-latest]')?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
-  }, [descriptions.length, visible]);
-  const rounds = [...new Set([...(game ? [game.round] : []), ...descriptions.map(d => d.round)])].sort((a, b) => b - a);
   const latest = descriptions.at(-1);
-  function card(id: string, description?: Description) {
+  const previousRounds = [...new Set(descriptions.map(d => d.round))].filter(round => round !== game?.round).sort((a, b) => b - a);
+  const current = descriptions.filter(d => d.round === game?.round);
+  // Placeholders already occupy the final slots; publication never reorders the cards.
+  const currentIds = game?.order.filter(id => current.some(d => d.playerId === id) || players.some(p => p.id === id && p.alive && !p.waiting)) ?? [];
+  function card(id: string, description?: Description, currentRound = false) {
     const player = players.find(p => p.id === id);
-    const active = !description && game?.phase === 'description' && game.turnPlayerId === id;
+    const active = currentRound && !description && game?.phase === 'description' && game.turnPlayerId === id;
     const text = description ? description.timedOut ? '… temps écoulé' : description.text : active ? 'Cherche son indice…' : 'Indice attendu';
-    return <li key={id} className={`${active ? 'clue-active' : ''} ${!description ? 'clue-pending' : ''} ${description?.timedOut ? 'clue-expired' : ''}`} data-latest={description === latest && !!description ? '' : undefined}>
-      <div className="clue-author">{player && <AvatarPortrait appearance={player.appearance} />}<strong>{player?.name ?? 'Joueur parti'}</strong></div><span>{text}</span>
+    return <li key={id} data-player-id={id} aria-current={active ? 'step' : undefined} className={`${active ? 'clue-active' : ''} ${!description ? 'clue-pending' : ''} ${description?.timedOut ? 'clue-expired' : ''}`}>
+      <div className="clue-author">{player && <AvatarPortrait appearance={player.appearance} />}<strong><PlayerName name={player?.name ?? 'Joueur parti'} mark={game?.playerMarks[id]} /></strong>{active && <span className="clue-turn" aria-label="À son tour">↗</span>}</div><span className="clue-text">{text}</span>
     </li>;
   }
-  return <section className="description-history" aria-label="Les indices du salon"><div className="panel-label"><h3>Les indices du salon <span>{descriptions.length}</span></h3><span className="eyebrow">ON VOUS ÉCOUTE.</span></div>
+  return <section className={`description-history ${currentIds.length > 8 ? 'clues-many' : ''}`} aria-label="Les indices du salon"><div className="panel-label"><h3>Les indices du salon <span>{game ? `· TOUR ${game.round}` : ''}</span></h3>{previousRounds.length ? <button className="text-button" onClick={() => setHistoryOpen(true)}>Tours passés · {previousRounds.length} ↗</button> : <span className="eyebrow">ON VOUS ÉCOUTE.</span>}</div>
     {!game ? <p className="clues-empty">Les premiers indices arriveront avec la partie.</p> : <>
       <p className="latest-clue sr-only" aria-live="polite">{latest ? `${players.find(p => p.id === latest.playerId)?.name ?? 'Joueur'} : ${latest.timedOut ? 'temps écoulé' : latest.text}` : 'En attente du premier indice.'}</p>
-      <div className="history-rounds" ref={list}>{rounds.map((round, index) => {
-        const clues = descriptions.filter(d => d.round === round);
-        const content = <ol>{clues.map(d => card(d.playerId, d))}{round === game.round && game.order.filter(id => !clues.some(d => d.playerId === id) && players.some(p => p.id === id && p.alive && !p.waiting)).map(id => card(id))}</ol>;
-        return index === 0 ? <section key={round} ref={current} aria-label={`Indices du tour ${round}`}><h3>TOUR {round}</h3>{content}</section> : <section key={round} aria-label={`Indices du tour ${round}`}><details><summary>TOUR {round} · {clues.length} indices</summary>{content}</details></section>;
-      })}</div>
+      <div className="history-rounds"><section className="current-round" aria-label={`Indices du tour ${game.round}`}><ol>{currentIds.map(id => card(id, current.find(d => d.playerId === id), true))}</ol></section>
+        {historyOpen && previousRounds.length > 0 && <Modal title="Les tours précédents" onClose={() => setHistoryOpen(false)}><div className="previous-rounds">{previousRounds.map(round => <section key={round} aria-label={`Indices du tour ${round}`}><h3>TOUR {round}</h3><ol>{descriptions.filter(d => d.round === round).map(d => card(d.playerId, d))}</ol></section>)}</div></Modal>}
+      </div>
     </>}
   </section>;
 }
