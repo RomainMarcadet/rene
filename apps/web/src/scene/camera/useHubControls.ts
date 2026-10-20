@@ -26,7 +26,7 @@ export function useHubControls(room: RoomSnapshot, orbit: MutableRefObject<Orbit
       const pressed = (...values: string[]) => values.some(k => keys.current.has(k));
       const x = touch.current.x + Number(pressed('d', 'arrowright')) - Number(pressed('q', 'a', 'arrowleft'));
       const z = touch.current.z + Number(pressed('s', 'arrowdown')) - Number(pressed('z', 'w', 'arrowup'));
-      if (x || z) { const direction = cameraRelative(x, z, orbit.current.yaw); move(direction.x, direction.z); }
+      if (x || z) { const direction = cameraRelative(x, z, orbit.current.viewYaw); move(direction.x, direction.z); }
     }, 67);
     window.addEventListener('keydown', down); window.addEventListener('keyup', up); window.addEventListener('blur', reset); window.addEventListener('resize', reset); window.visualViewport?.addEventListener('resize', reset); document.addEventListener('visibilitychange', reset); document.addEventListener('focusin', focus);
     focus();

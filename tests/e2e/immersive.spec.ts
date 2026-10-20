@@ -20,7 +20,7 @@ async function camera(page: Page) {
     const local = store.room.players.find((p: { id: string }) => p.id === store.session.playerId);
     const projected = state.camera.position.clone().set(local.position.x, 1.35, local.position.z).project(state.camera);
     const gl = state.gl.getContext(); const debug = gl.getExtension('WEBGL_debug_renderer_info'); const renderer = gl.getParameter(debug ? debug.UNMASKED_RENDERER_WEBGL : gl.RENDERER);
-    return { renderer, blocked, focus: document.activeElement?.tagName, focusClass: document.activeElement?.className, joystick: document.querySelector('.joystick span')?.getAttribute('style'), perspective: state.camera.isPerspectiveCamera, position: state.camera.position.toArray(), orbitYaw: state.camera.userData.orbitYaw, shot: state.camera.userData.shot, area: state.camera.userData.clearArea, screen: { x: (projected.x + 1) * state.size.width / 2, y: (1 - projected.y) * state.size.height / 2 }, local: local.position, calls: state.gl.info.render.calls, triangles: state.gl.info.render.triangles };
+    return { renderer, renderDpr: state.gl.getPixelRatio(), blocked, focus: document.activeElement?.tagName, focusClass: document.activeElement?.className, joystick: document.querySelector('.joystick span')?.getAttribute('style'), perspective: state.camera.isPerspectiveCamera, position: state.camera.position.toArray(), orbitYaw: state.camera.userData.orbitYaw, shot: state.camera.userData.shot, area: state.camera.userData.clearArea, screen: { x: (projected.x + 1) * state.size.width / 2, y: (1 - projected.y) * state.size.height / 2 }, local: local.position, calls: state.gl.info.render.calls, triangles: state.gl.info.render.triangles };
   });
 }
 test('TPS prototype: free orbit, camera relative movement, HUD framing and same Canvas', async ({ browser, baseURL }) => {
@@ -69,6 +69,8 @@ test('Chez René: twelve simultaneous movers, face view, no network camera, resp
     for (const p of (await livingState(page)).players) expect(walkable(p.position)).toBe(true);
     for (const a of f.actors) expect((await livingSend(a, { type: 'player.emote', kind: 'macarena_full' })).ok).toBe(true);
     expect(await livingUI(page, { type: 'player.emote', kind: 'macarena_full' })).toBe(true);
+    // Allow the two three-second resolution samples to settle before measuring steady rendering.
+    await page.waitForTimeout(6500);
     const metrics = await page.evaluate(async () => {
       const frames: number[] = []; let last = performance.now(); const end = last + 3000;
       await new Promise<void>(resolve => { function frame(now: number) { frames.push(now - last); last = now; if (now < end) requestAnimationFrame(frame); else resolve(); } requestAnimationFrame(frame); });
@@ -77,7 +79,10 @@ test('Chez René: twelve simultaneous movers, face view, no network camera, resp
     await writeFile('output/playwright/v1.4-twelve-metrics.json', JSON.stringify({ ...metrics, render: await camera(page) }, null, 2));
     await page.getByRole('button', { name: 'Vue collective' }).click(); await page.waitForTimeout(600);
     // Give the local avatar breathing room before the front-view capture; no teleport fixture.
-    await page.keyboard.down('a'); await page.waitForTimeout(500); await page.keyboard.up('a'); await page.waitForTimeout(150);
+    await page.keyboard.down('a');
+    try { await expect.poll(async () => (await camera(page)).local.x).toBeGreaterThan(5.6); }
+    finally { await page.keyboard.up('a'); }
+    await page.waitForTimeout(150);
     const idle = await livingState(page); const area = (await camera(page)).area;
     const x = area.left + area.width / 2; const y = area.top + area.height / 2;
     await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 262, y, { steps: 20 }); await page.mouse.up(); await page.waitForTimeout(400);
@@ -120,6 +125,13 @@ test.describe('immersive mobile input', () => {
       await page.getByRole('button', { name: /Changer de tête/ }).click();
       await page.getByLabel('L’allure', { exact: true }).selectOption('nervous'); await page.screenshot({ path: 'output/playwright/v1.4-personality-mobile.png' }); await page.getByRole('button', { name: /Voilà ma nouvelle tête/ }).click();
       await expect.poll(() => f.actors[0].room?.players.find(p => p.name === 'Camille')?.appearance.personality).toBe('nervous');
+      await page.getByRole('navigation', { name: 'Panneaux du salon' }).getByRole('button', { name: /^Suspects/ }).click();
+      await expect(page.locator('.joystick')).toBeVisible(); const resumed = (await camera(page)).local; const pad = (await page.locator('.joystick').boundingBox())!;
+      const px = pad.x + pad.width / 2; const py = pad.y + pad.height / 2;
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: px, y: py, id: 1 }] });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: px - 25, y: py, id: 1 }] });
+      try { await expect.poll(async () => { const p = (await camera(page)).local; return Math.hypot(p.x - resumed.x, p.z - resumed.z); }).toBeGreaterThan(.15); }
+      finally { await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); }
       await page.reload(); await expect(page.locator('.participants li')).toHaveCount(4);
       expect((await livingState(page)).players.find(p => p.name === 'Camille')!.appearance.personality).toBe('nervous');
     } finally { await f.close(); }

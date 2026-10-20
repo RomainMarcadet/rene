@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cameraDistance, cameraRelative, phaseShot, shotKey } from './math';
 import type { RoomSnapshot } from '@rene/contracts';
+import { nextResolution } from './ResolutionBudget';
 describe('TPS and camera direction', () => {
   it('maps all controls through the same horizontal orbit without diagonal speedup', () => {
     expect(cameraRelative(0, -1, 0)).toEqual({ x: 0, z: -1 });
@@ -13,6 +14,16 @@ describe('TPS and camera direction', () => {
     expect(cameraDistance(origin, { x: 0, y: 0, z: -1 }, 5)).toBeLessThan(2);
     expect(cameraDistance({ x: 4, y: 2, z: 0 }, { x: 0, y: .3, z: .95 }, 4)).toBe(4);
     expect(origin).toEqual(before);
+  });
+  it('uses a temporary cutaway when furniture would force a close-up and keeps the list reusable', () => {
+    const hidden: string[] = [];
+    expect(cameraDistance({ x: 0, y: .5, z: 3 }, { x: 0, y: 0, z: -1 }, 5, hidden)).toBe(5);
+    expect(hidden).toEqual(['table']); hidden.length = 0;
+    expect(cameraDistance({ x: 4, y: 2, z: 0 }, { x: 0, y: 0, z: 1 }, 4, hidden)).toBe(4); expect(hidden).toEqual([]);
+  });
+  it('reduces only slow rendering within a fixed floor and leaves fast frames unchanged', () => {
+    expect(nextResolution(1, 1 / 60)).toBe(1); expect(nextResolution(1, 1 / 20)).toBe(.85);
+    expect(nextResolution(.85, 1 / 20)).toBe(.7); expect(nextResolution(.7, 1 / 10)).toBe(.7);
   });
   it('preserves collective voting and makes short shots interruptible', () => {
     for (const p of ['vote', 'tiebreak'] as const) expect(phaseShot(p, 0, true, true)).toBe('group');

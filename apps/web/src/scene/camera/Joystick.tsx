@@ -19,5 +19,9 @@ export function Joystick({ value, visible, area }: { value: MutableRefObject<{ x
     value.current.x = Math.abs(x) < .12 ? 0 : x; value.current.z = Math.abs(z) < .12 ? 0 : z; setKnob({ x: x * 25, y: z * 25 });
   };
   if (!shown) return null;
-  return <div className="joystick" aria-label="Joystick de déplacement" style={{ left: area.left + 8, top: area.top + area.height - size - 8, bottom: 'auto', width: size, height: size }} onPointerDown={e => { e.preventDefault(); if (pointer.current !== null) return; pointer.current = e.pointerId; e.currentTarget.setPointerCapture(e.pointerId); update(e); }} onPointerMove={update} onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release}><span style={{ transform: `translate(${knob.x}px, ${knob.y}px)` }}>✣</span></div>;
+  return <div className="joystick" aria-label="Joystick de déplacement" style={{ left: area.left + 8, top: area.top + area.height - size - 8, bottom: 'auto', width: size, height: size }} onPointerDown={e => {
+    e.preventDefault(); if (pointer.current !== null || document.querySelector('dialog[open]')) return;
+    document.querySelector<HTMLCanvasElement>('.hub-canvas canvas')?.focus({ preventScroll: true });
+    pointer.current = e.pointerId; e.currentTarget.setPointerCapture(e.pointerId); update(e);
+  }} onPointerMove={update} onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release}><span style={{ transform: `translate(${knob.x}px, ${knob.y}px)` }}>✣</span></div>;
 }

@@ -350,6 +350,4 @@
 @media (pointer: coarse) { .joystick { display: flex; } }
 @media (max-height: 600px) { .joystick { width: 72px; height: 72px; bottom: 155px; } }
 
-.world-sign { width: 180px; font-family: Arial, sans-serif; font-size: 26px; line-height: 1.05; font-weight: 900; text-align: center; color: #F5F2EA; }
-.world-sign em { display: block; margin-top: 5px; font-size: 11px; letter-spacing: 0; }
 @media (pointer: coarse) { .camera-controls button { min-height: 44px; min-width: 44px; } }

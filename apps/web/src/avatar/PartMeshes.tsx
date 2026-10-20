@@ -27,7 +27,7 @@ export const AvatarHead = memo(function AvatarHead({ appearance, eliminated = fa
   const eyes = useRef<Group>(null); const mouth = useRef<Group>(null);
   useFrame(() => {
     if (eyes.current) { eyes.current.scale.y = eliminated ? 1 : motion?.current.blink ?? 1; eyes.current.position.x = eliminated ? 0 : motion?.current.look ?? 0; }
-    if (mouth.current) mouth.current.scale.y = 1 + (eliminated ? 0 : motion?.current.talk ?? 0);
+    if (mouth.current) mouth.current.scale.y = 1 + (motion?.current.talk ?? 0);
   });
   return <group name={`appearance:${appearance.head}:${appearance.hair}:${appearance.eyes}:${appearance.mouth}:${appearance.nose}:${appearance.accessory}`}>
     {[...model.head.parts, ...model.hair, ...model.nose, ...model.accessory].map((part, index) => <PartMesh key={index} part={part} appearance={appearance} eliminated={eliminated} />)}
