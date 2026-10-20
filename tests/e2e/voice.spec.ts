@@ -175,19 +175,21 @@ test('eliminated players keep receiving audio after the server rotates voice per
       await page.goto(pages[0].url()); await page.getByLabel('Pseudonyme').fill(names[i]);
       await page.getByRole('button', { name: 'Rejoindre →', exact: true }).click();
     }
-    for (const page of pages) await page.getByRole('button', { name: 'Je suis prêt →', exact: true }).click();
+    await Promise.all(pages.map(page => page.getByRole('button', { name: 'Je suis prêt →', exact: true }).click()));
     await pages[0].getByRole('button', { name: /Lancer la partie/ }).click();
     await expect(pages[0].locator('.phase-description')).toBeVisible({ timeout: 15000 });
     for (let n = 0; n < 5; n++) {
       let speaker = -1;
       await expect.poll(async () => {
-        for (const [index, page] of pages.entries()) if (await page.getByLabel('Votre indice', { exact: true }).isVisible()) return speaker = index;
-        return -1;
+        const visible = await Promise.all(pages.map(page => page.getByLabel('Votre indice', { exact: true }).isVisible()));
+        return speaker = visible.findIndex(Boolean);
       }).not.toBe(-1);
       await submitDescription(pages[speaker], `Indice discret ${n}`, pages);
     }
     await pages[0].getByRole('button', { name: /Passer au vote/ }).click();
-    for (const [index, page] of pages.entries()) await page.getByRole('button', { name: `Voter pour ${names[index === 1 ? 0 : 1]}`, exact: true }).click();
+    // Independent clients can prepare/vote together, as in a real salon. Keep
+    // browser round trips from consuming the existing 90 s scenario budget.
+    await Promise.all(pages.map((page, index) => page.getByRole('button', { name: `Voter pour ${names[index === 1 ? 0 : 1]}`, exact: true }).click()));
     await expect(pages[1].locator('.microphone-state')).toContainText('Écoute seule');
     await expect(pages[1].getByRole('button', { name: 'Maintenir pour parler · V', exact: true })).toBeDisabled();
     await expect(pages[1].locator('.voice-panel')).toContainText('À l’écoute des vivants', { timeout: 15000 });
