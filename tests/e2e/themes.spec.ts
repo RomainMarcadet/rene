@@ -6,7 +6,7 @@ test('chooses multiple themes for the room with an explicit, persistent 18+ opti
   const host = pages[0];
   try {
     for (const page of pages) {
-      await expect(page.getByRole('region', { name: 'Thèmes des mots' })).toContainText('Tous les thèmes classiques');
+      await expect(page.getByRole('region', { name: 'Thèmes des mots' })).toContainText('Cinéma · Jeux vidéo · Internet · Musique · Télévision · Culture · Sport · Technologie');
       await expect(page.locator('.theme-adult-badge')).toHaveCount(0);
     }
     await expect(pages[1].getByRole('button', { name: 'Choisir les thèmes' })).toHaveCount(0);
