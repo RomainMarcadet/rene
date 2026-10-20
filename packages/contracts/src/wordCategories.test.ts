@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CommandSchema, DEFAULT_SETTINGS, SettingsSchema, PUBLIC_WORD_CATEGORIES, selectedWordCategories, wordSelectionLabel } from './index.js';
+import { CommandSchema, DEFAULT_SETTINGS, SettingsSchema, selectedWordCategories, wordSelectionLabel } from './index.js';
 
 describe('word theme settings', () => {
   it('restores old room settings with an explicit default adult exclusion', () => {
