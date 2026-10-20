@@ -52,7 +52,7 @@ Autres réductions :
 
 - Le salut et les autres gestes utilisent un trait continu par bras et une main simple, sans coude ni demi-bras articulé : six maillages retirés par avatar.
 - Le serveur ignore les déplacements qui ne changent ni la position ni l’orientation.
-- Le décor statique est mémorisé ; la projection de la caméra change seulement quand le zoom change.
+- Le décor statique est mémorisé ; la projection de la caméra historique changeait seulement quand le zoom changeait ; le salon TPS recalcule la projection aux changements de viewport/HUD.
 - La résolution du rendu 3D est plafonnée à 1,25 sur ordinateur et à 1 en affichage compact. Les textes de l’interface restent des éléments HTML.
 - Le rendu 3D est suspendu lorsque l’onglet est masqué.
 - L’adresse du salon n’est réécrite que lorsque son code change.
@@ -89,7 +89,7 @@ Sources : [mesure V1.5](media/v1.5/metrics.json), [mesure brute actuelle](media/
 
 ## Résultats de validation
 
-`npm run check` réussit sur les sources finales : typage TypeScript, ESLint, **353 tests dans 29 fichiers**, build web, contrôle de séparation de la banque de mots, puis build serveur. Le contrôle du client inspecte huit ressources construites et détecte zéro fuite du catalogue.
+`npm run check` réussit, avant réconciliation avec le salon TPS, sur les sources de la PR initiale : typage TypeScript, ESLint, **353 tests dans 29 fichiers**, build web, contrôle de séparation de la banque de mots, puis build serveur. Le contrôle du client inspecte huit ressources construites et détecte zéro fuite du catalogue.
 
 Les **32 scénarios navigateur distincts** ont réussi au cours de la campagne et des reprises ciblées :
 
