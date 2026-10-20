@@ -35,6 +35,13 @@ export async function submitDescription(page: Page, text: string, observers: rea
 
 export async function showPanel(page: Page, panel: 'Suspects' | 'Indices' | 'Discussion') {
   await expect(page.locator('.room-page')).toBeVisible();
+  // setViewportSize resolves before React necessarily commits its resize event.
+  // Wait for the HUD's actual viewport before deciding whether a drawer exists.
+  const viewport = page.viewportSize();
+  if (viewport) await expect.poll(() => page.locator('.room-page').evaluate((node, size) => {
+    const style = (node as HTMLElement).style;
+    return Math.abs(parseFloat(style.width) - size.width) < 1 && Math.abs(parseFloat(style.height) - size.height) < 1;
+  }, viewport)).toBe(true);
   const button = page.getByRole('navigation', { name: 'Panneaux du salon' }).getByRole('button', { name: new RegExp(`^${panel}`) });
   if (await button.isVisible() && await button.getAttribute('aria-expanded') !== 'true') await button.click();
 }

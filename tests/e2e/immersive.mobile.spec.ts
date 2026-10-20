@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
+import { avatarScene } from './avatarScene';
 import { livingCamera as camera, livingRoom, livingState } from './livingRoomFixture';
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, video: { mode: 'on', size: { width: 390, height: 844 } } });
 test.afterEach(async ({ page }, info) => { const video = page.video(); await page.close(); if (video && info.status === 'passed') { await mkdir('output/playwright', { recursive: true }); await video.saveAs('output/playwright/v1.4-touch.webm'); } });
@@ -37,5 +38,7 @@ test('two fingers move and orbit together; drawer cancels movement; personality 
     await page.reload(); await expect(page.locator('.participants li')).toHaveCount(4);
     expect((await livingState(page)).players.find(p => p.name === 'Camille')!.appearance.personality).toBe('nervous');
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('rene-profile')!).appearance.personality)).toBe('nervous');
+    await expect.poll(async () => { const scene = await avatarScene(page); return scene && scene.calls > 0 ? scene.names.length : 0; }).toBe(4);
+    await page.screenshot({ path: 'output/playwright/v1.4-reconnected-mobile.png' });
   } finally { await f.close(); }
 });
