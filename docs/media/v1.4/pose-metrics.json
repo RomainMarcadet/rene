@@ -1,0 +1,9 @@
+{
+  "iterations": 120000,
+  "rounds": 3,
+  "baseWalkMs": 124.77241700000002,
+  "walkWithPersonalityMs": 142.203166,
+  "node": "v25.8.0",
+  "platform": "darwin",
+  "arch": "arm64"
+}

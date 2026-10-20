@@ -32,6 +32,13 @@ async function eliminate(rooms: Rooms, room: Room, target: string, now: number) 
 }
 
 describe('authoritative room lifecycle', () => {
+  it('rejects movement into the new sofa and lamp without changing the authoritative position', async () => {
+    const { rooms, room } = await fixture(); const p = room.players.get('p0')!;
+    for (const [x, z, dx, dz, time] of [[-2.5, -3.8, -1, 0, 100], [6.2, -2.8, 0, -1, 200]]) {
+      p.position = { x, z, yaw: 0 }; const before = { ...p.position };
+      expect(rooms.move(room, p.id, { x: dx, z: dz }, initialTime + time)).toBe(false); expect(p.position).toEqual(before);
+    }
+  });
   it('requires a connected, ready roster and host authorization', async () => {
     const { rooms, room } = await fixture();
     await expect(rooms.command(room, 'p1', { type: 'game.start' }, initialTime)).rejects.toThrow('hôte');

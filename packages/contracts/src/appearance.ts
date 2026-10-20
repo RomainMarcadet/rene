@@ -13,15 +13,18 @@ export const AVATAR_CATALOG = {
 export type AvatarCategory = keyof typeof AVATAR_CATALOG;
 export function variantIds<T extends Record<string, string>>(catalogue: T) { return Object.keys(catalogue) as [Extract<keyof T, string>, ...Extract<keyof T, string>[]]; }
 export const HEADWEAR = ['hat', 'beret', 'cap', 'crown', 'beanie'] as const;
+export const PERSONALITIES = { nervous: 'Le nerveux', relaxed: 'Le nonchalant', proud: 'Le prétentieux', impassive: 'L’impassible' } as const;
+export type Personality = keyof typeof PERSONALITIES;
 export const AppearanceSchema = z.object({
   head: z.enum(variantIds(AVATAR_CATALOG.head)), skin: z.enum(COLORS), body: z.enum(COLORS),
   hair: z.enum(variantIds(AVATAR_CATALOG.hair)), hairColor: z.enum(COLORS),
   eyes: z.enum(variantIds(AVATAR_CATALOG.eyes)), nose: z.enum(variantIds(AVATAR_CATALOG.nose)),
   mouth: z.enum(variantIds(AVATAR_CATALOG.mouth)), accessory: z.enum(variantIds(AVATAR_CATALOG.accessory)),
   accessoryColor: z.enum(COLORS).optional(),
-}).strict().transform(a => ({ ...a, accessoryColor: a.accessoryColor ?? (a.accessory === 'hat' ? '#65B847' : '#191719') }));
+  personality: z.enum(variantIds(PERSONALITIES)).optional(),
+}).strict().transform(a => ({ ...a, personality: a.personality ?? 'impassive' as const, accessoryColor: a.accessoryColor ?? (a.accessory === 'hat' ? '#65B847' : '#191719') }));
 export type AvatarAppearance = z.infer<typeof AppearanceSchema>;
-export const DEFAULT_APPEARANCE: AvatarAppearance = { head: 'pear', skin: '#EE89BA', body: '#087BA0', hair: 'tuft', hairColor: '#191719', eyes: 'wide', nose: 'long', mouth: 'flat', accessory: 'glasses', accessoryColor: '#191719' };
+export const DEFAULT_APPEARANCE: AvatarAppearance = { head: 'pear', skin: '#EE89BA', body: '#087BA0', hair: 'tuft', hairColor: '#191719', eyes: 'wide', nose: 'long', mouth: 'flat', accessory: 'glasses', accessoryColor: '#191719', personality: 'impassive' };
 
 /** Shared by the editor and tests; each complete appearance is validated at the boundary. */
 export function randomAppearance(random: () => number = Math.random): AvatarAppearance {
@@ -35,6 +38,6 @@ export function randomAppearance(random: () => number = Math.random): AvatarAppe
     head: pick(variantIds(AVATAR_CATALOG.head)), skin, body: pick(COLORS.filter(color => color !== skin)),
     hair: (HEADWEAR as readonly string[]).includes(accessory) ? 'none' : pick(variantIds(AVATAR_CATALOG.hair)),
     hairColor: pick(COLORS), eyes: pick(variantIds(AVATAR_CATALOG.eyes)), nose: pick(variantIds(AVATAR_CATALOG.nose)),
-    mouth: pick(variantIds(AVATAR_CATALOG.mouth)), accessory, accessoryColor: pick(COLORS),
+    mouth: pick(variantIds(AVATAR_CATALOG.mouth)), accessory, accessoryColor: pick(COLORS), personality: pick(variantIds(PERSONALITIES)),
   });
 }

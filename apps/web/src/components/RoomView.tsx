@@ -49,7 +49,7 @@ export function RoomView({ room }: { room: RoomSnapshot }) {
   function customize() { setAppearance(player.appearance); setName(player.name); setModal('avatar'); }
   return <main ref={root} className={`room-page layout-${viewport.layout} ${drawer ? 'drawer-open' : ''} ${drawer === 'clues' ? 'clues-open' : ''} ${room.game ? 'in-game' : ''} ${expanded ? 'chat-expanded' : ''}`} style={{ height: viewport.height, top: viewport.top, left: viewport.left, width: viewport.width }}>
     <section className="scene-panel" aria-label="Le salon 3D partagé">
-      <SceneBoundary><Suspense fallback={<div className="scene-loading">On arrange les coussins…</div>}><Hub room={room} playerId={me} speaking={speaking} clearArea={clearArea} compact={viewport.layout === 'mobile'} controlsVisible={!drawer && !expanded} /></Suspense></SceneBoundary>
+      <SceneBoundary><Suspense fallback={<div className="scene-loading">On arrange les coussins…</div>}><Hub room={room} playerId={me} speaking={speaking} clearArea={clearArea} compact={viewport.layout === 'mobile'} paused={!!modal} controlsVisible={!drawer && !expanded && !modal && !socialOpen} /></Suspense></SceneBoundary>
     </section>
     <div className="navigation-zone" data-occluder><RoomNavigation room={room} compact={viewport.layout === 'mobile'} onOpen={setModal} onInvite={invite} /></div>
     <div className="scene-caption"><span className="pill">CHEZ RENÉ</span><span>{room.players.filter(p => p.connected).length} / 12 DANS LE SALON</span></div>

@@ -1,0 +1,43 @@
+{
+  "samples": 41,
+  "medianFrameMs": 66.59999999999854,
+  "p95FrameMs": 150,
+  "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36",
+  "viewport": [
+    1586,
+    992
+  ],
+  "dpr": 1,
+  "render": {
+    "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+    "blocked": false,
+    "focus": "BUTTON",
+    "focusClass": "",
+    "joystick": "transform: translate(0px, 0px);",
+    "perspective": true,
+    "position": [
+      5.67119705969176,
+      19.39243392093228,
+      13.102092153997571
+    ],
+    "orbitYaw": 3.141592653589793,
+    "shot": "group",
+    "area": {
+      "left": 302,
+      "top": 80,
+      "width": 902,
+      "height": 816.953125
+    },
+    "screen": {
+      "x": 1029.8854373331708,
+      "y": 583.3515788812407
+    },
+    "local": {
+      "x": 7,
+      "z": 7.006939126001496e-16,
+      "yaw": 1.5707963267948966
+    },
+    "calls": 442,
+    "triangles": 38744
+  }
+}
