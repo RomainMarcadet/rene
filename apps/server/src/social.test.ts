@@ -155,6 +155,26 @@ describe('ephemeral authoritative social engine', () => {
     expect(f.a.social.animation).toBeUndefined(); expect(f.b.social.animation?.kind).toBe('play_dead');
     expect(f.b.alive).toBe(true);
   });
+  it('rejects and interrupts ground taunts when an eliminated player dances at results', async () => {
+    const f = await fixture(); await f.start();
+    f.room.game!.alive = f.room.game!.alive.filter(id => id !== 'p1');
+    f.room.game!.phase = 'results';
+    const game = structuredClone(f.room.game); const voice = f.room.voiceGeneration;
+    // The default eliminated pose is on the floor, but a voluntary dance overrides it.
+    await f.act('p0', { type: 'player.emote', kind: 'crouch_taunt', targetId: 'p1' });
+    await f.act('p1', { type: 'player.emote', kind: 'dance' }, T + 100);
+    await f.rooms.tick(f.room, T + 101);
+    expect(f.b.social.animation?.kind).toBe('dance');
+    expect(f.a.social.animation).toBeUndefined();
+    const before = structuredClone(f.a.social);
+    await expect(f.act('p0', { type: 'player.emote', kind: 'crouch_taunt', targetId: 'p1' }, T + 500)).rejects.toThrow('sol');
+    expect(f.a.social).toEqual(before);
+    expect(f.room.game).toEqual(game); expect(f.room.voiceGeneration).toBe(voice);
+    // Expiration restores the eliminated resting pose without changing the game.
+    await f.rooms.tick(f.room, T + 2600);
+    await f.act('p0', { type: 'player.emote', kind: 'crouch_taunt', targetId: 'p1' }, T + 2600);
+    expect(f.a.social.animation?.kind).toBe('crouch_taunt');
+  });
   it('preserves active server-time dance across reconnect and rejects a late stop against a replacement', async () => {
     const f = await fixture();
     await f.act('p0', { type: 'player.emote', kind: 'macarena_full' });

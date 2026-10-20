@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CommandSchema, EnvelopeSchema, ANIMATIONS, ANIMATION_IDS, clearSocialPath, withinSocialReach, socialParticipantAllowed } from './index.js';
+import { CommandSchema, EnvelopeSchema, ANIMATIONS, ANIMATION_IDS, clearSocialPath, withinSocialReach, socialParticipantAllowed, isGrounded, type SocialPlayerState } from './index.js';
 describe('social wire contracts', () => {
   it('rejects client-declared identities, impacts, hit counts, durations and positions', () => {
     const attack = { type: 'player.attack', kind: 'punch', targetId: 'neighbor' };
@@ -31,5 +31,49 @@ describe('social wire contracts', () => {
     expect(socialParticipantAllowed({ ...alive, alive: false }, 'results')).toBe(true);
     expect(socialParticipantAllowed({ ...alive, waiting: true }, 'results')).toBe(true);
     expect(socialParticipantAllowed({ ...alive, connected: false })).toBe(false);
+  });
+});
+
+describe('visible ground-target posture', () => {
+  const alive = { alive: true, waiting: false };
+  const eliminated = { alive: false, waiting: false };
+  const state = (): SocialPlayerState => ({ acceptsPhysical: true, protectedUntil: 0, nextAttackAt: 0 });
+  it('limits play-dead eligibility to its stable hold, including for an eliminated participant', () => {
+    const social = state(); social.animation = { instanceId: 'floor', kind: 'play_dead', startedAt: 1000, endsAt: 8000, seed: 0 };
+    for (const player of [alive, eliminated]) {
+      for (const [now, grounded] of [[1000, false], [1499, false], [1500, true], [7499, true], [7500, false], [7999, false]] as const) {
+        expect(isGrounded(player, social, now, 'results')).toBe(grounded);
+      }
+    }
+    expect(isGrounded(alive, social, 8000, 'results')).toBe(false);
+    expect(isGrounded(eliminated, social, 8000, 'results')).toBe(true);
+  });
+  it.each(['dance', 'wave', 'kneel', 'macarena_full', 'hug', 'carry'] as const)('%s overrides the eliminated resting pose only while active', kind => {
+    const social = state(); social.animation = { instanceId: 'upright', kind, startedAt: 1000, endsAt: 3500, seed: 0 };
+    expect(isGrounded(eliminated, social, 999, 'results')).toBe(true);
+    expect(isGrounded(eliminated, social, 1000, 'results')).toBe(false);
+    expect(isGrounded(eliminated, social, 3499, 'results')).toBe(false);
+    expect(isGrounded(eliminated, social, 3500, 'results')).toBe(true);
+  });
+  it('prioritizes physical reactions and recovery over a ground posture without changing identity', () => {
+    const social = state(); social.animation = { instanceId: 'floor', kind: 'play_dead', startedAt: 0, endsAt: 7000, seed: 0 };
+    social.physical = { instanceId: 'stun', kind: 'stun', startedAt: 1000, stunEndsAt: 3500, endsAt: 4000, sourceYaw: 0 };
+    expect(isGrounded(eliminated, social, 1000, 'results')).toBe(true);
+    expect(isGrounded(eliminated, social, 3499, 'results')).toBe(true);
+    expect(isGrounded(eliminated, social, 3500, 'results')).toBe(false);
+    expect(isGrounded(eliminated, social, 3999, 'results')).toBe(false);
+    expect(isGrounded(eliminated, social, 4000, 'results')).toBe(true);
+    social.physical = { ...social.physical, kind: 'hit_reaction', endsAt: 1220 };
+    expect(isGrounded(eliminated, social, 999, 'results')).toBe(true);
+    expect(isGrounded(eliminated, social, 1000, 'results')).toBe(false);
+    expect(isGrounded(eliminated, social, 1219, 'results')).toBe(false);
+    expect(isGrounded(eliminated, social, 1220, 'results')).toBe(true);
+  });
+  it('keeps lobby and spectators distinct and ignores interrupted social poses during voting', () => {
+    const social = state();
+    expect(isGrounded(eliminated, social, 2000)).toBe(false);
+    expect(isGrounded({ alive: false, waiting: true }, social, 2000, 'results')).toBe(false);
+    social.animation = { instanceId: 'dance', kind: 'dance', startedAt: 1000, endsAt: 3500, seed: 0 };
+    for (const phase of ['vote', 'tiebreak'] as const) expect(isGrounded(eliminated, social, 2000, phase)).toBe(true);
   });
 });

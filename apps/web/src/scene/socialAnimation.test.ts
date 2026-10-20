@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ANIMATIONS, ANIMATION_IDS, MACARENA_BEAT_MS as BEAT, MACARENA_MEASURE_MS as MEASURE, type AnimationId, type SocialPlayerState } from '@rene/contracts';
+import { ANIMATIONS, ANIMATION_IDS, MACARENA_BEAT_MS as BEAT, MACARENA_MEASURE_MS as MEASURE, isGrounded, type AnimationId, type SocialPlayerState } from '@rene/contracts';
 import { avatarPose, createPose } from './animation';
 import { legLayout, createLegLayout } from './poses/legs';
 import { MACARENA_STEPS } from './poses/macarena';
@@ -26,6 +26,16 @@ describe('social choreography', () => {
   it('retains elimination eyes but permits a results gesture ahead of automatic celebration/elimination', () => {
     const p = avatarPose({ time: 1, now: 1800, moving: false, reduced: false, dead: true, winner: true, phase: 'results', social: state('kneel') });
     expect(p.state).toBe('kneel'); expect(p.ik).toBe(true);
+  });
+  it('agrees with ground eligibility when an eliminated results avatar stands up to dance', () => {
+    const social = state('dance'); const player = { alive: false, waiting: false };
+    for (const [now, expected, grounded] of [[999, 'eliminated', true], [1000, 'dancing', false], [1800, 'dancing', false], [3500, 'eliminated', true]] as const) {
+      const p = avatarPose({ time: 1, now, moving: false, reduced: false, dead: true, phase: 'results', social });
+      expect(p.state).toBe(expected);
+      expect(isGrounded(player, social, now, 'results')).toBe(grounded);
+      if (expected === 'dancing') expect(Math.abs(p.roll)).toBeLessThan(.18);
+      else expect(p.roll).toBe(-1.2);
+    }
   });
   it('prioritizes physical reaction over voluntary poses and returns after the exact deadline', () => {
     const social = state('macarena_full');

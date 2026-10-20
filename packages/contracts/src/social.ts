@@ -67,6 +67,23 @@ export function physicalStage(physical: PhysicalInstance | undefined, now: numbe
   if (physical.kind === 'hit_reaction') return 'hit_reaction';
   return now < physical.startedAt + SOCIAL_COMBAT_CONFIG.fallMs ? 'stun_fall' : now < physical.stunEndsAt ? 'stunned_loop' : 'get_up';
 }
+/** Ground-target eligibility follows avatarPose priority, not business elimination alone. */
+export function isGrounded(player: { alive: boolean; waiting: boolean }, state: SocialPlayerState | undefined, now: number, phase?: Phase) {
+  if (socialPhaseAllowed(phase)) {
+    const physical = state?.physical;
+    if (physical && now >= physical.startedAt && now < physical.endsAt) {
+      const stage = physicalStage(physical, now);
+      return stage === 'stun_fall' || stage === 'stunned_loop';
+    }
+    const animation = state?.animation;
+    if (animation && now >= animation.startedAt && now < animation.endsAt) {
+      // Only the stable hold of play_dead is a voluntary ground target.
+      // Any other active animation overrides the default eliminated pose.
+      return animation.kind === 'play_dead' && now >= animation.startedAt + 500 && now < animation.endsAt - 500;
+    }
+  }
+  return !!phase && !player.alive && !player.waiting;
+}
 export function socialMovementAllowed(state: SocialPlayerState | undefined, now: number) { return !state?.physical || state.physical.kind !== 'stun' || now >= state.physical.endsAt; }
 export const isSocialCommand = (type: string) => type === 'player.emote' || type === 'player.emote.stop' || type === 'player.attack' || type.startsWith('player.interaction.');
 

@@ -1,5 +1,5 @@
 import { randomInt, randomUUID } from 'node:crypto';
-import { ANIMATIONS, EMOTE_COOLDOWN_MS, SOCIAL_COMBAT_CONFIG as C, physicalStage, socialParticipantAllowed, socialMovementAllowed, withinSocialReach, type AnimationId, type AnimationInstance, type Command, type SharedInteraction, type SocialPlayerState, type SocialSnapshot } from '@rene/contracts';
+import { ANIMATIONS, EMOTE_COOLDOWN_MS, SOCIAL_COMBAT_CONFIG as C, isGrounded, physicalStage, socialParticipantAllowed, socialMovementAllowed, withinSocialReach, type AnimationId, type AnimationInstance, type Command, type SharedInteraction, type SocialPlayerState, type SocialSnapshot } from '@rene/contracts';
 import type { Player, Room } from './rooms.js';
 
 export interface ServerSocialPlayer extends SocialPlayerState { hits: number[]; lastStage: string }
@@ -41,8 +41,7 @@ export function cancelVoluntary(room: Room, p: Player) {
 }
 function groundTarget(room: Room, p: Player, target: Player | undefined, now: number) {
   if (!target) return false;
-  const stage = physicalStage(target.social.physical, now);
-  const ground = stage === 'stunned_loop' || stage === 'stun_fall' || (target.social.animation?.kind === 'play_dead' && now >= target.social.animation.startedAt + 500 && now < target.social.animation.endsAt - 500) || (!!room.game && !room.game.alive.includes(target.id) && !target.waiting);
+  const ground = isGrounded({ alive: room.game ? room.game.alive.includes(target.id) : target.alive, waiting: target.waiting }, target.social, now, room.game?.phase);
   return p.social.acceptsPhysical && target.connected && target.social.acceptsPhysical && target.id !== p.id && ground && withinSocialReach(p.position, target.position, C.interactionRange, false);
 }
 function requireActor(room: Room, p: Player, now: number, physical = false) {

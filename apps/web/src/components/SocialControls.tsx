@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ANIMATIONS, ANIMATION_IDS, SOCIAL_COMBAT_CONFIG as C, socialPhaseAllowed, physicalStage, socialMovementAllowed, socialParticipantAllowed, withinSocialReach, type AnimationCategory, type AnimationId, type AttackKind, type RoomSnapshot } from '@rene/contracts';
+import { ANIMATIONS, ANIMATION_IDS, SOCIAL_COMBAT_CONFIG as C, isGrounded, socialPhaseAllowed, physicalStage, socialMovementAllowed, socialParticipantAllowed, withinSocialReach, type AnimationCategory, type AnimationId, type AttackKind, type RoomSnapshot } from '@rene/contracts';
 import { send, useGame } from '../store';
 import { isEditing } from '../keyboard';
 import { Modal } from './Modal';
@@ -12,6 +12,13 @@ export function SocialControls({ room, open, setOpen }: { room: RoomSnapshot; op
   const opener = useRef<HTMLButtonElement>(null); const me = room.players.find(p => p.id === id)!;
   const social = room.social.players[id]; const now = Date.now() + offset;
   const allowed = socialParticipantAllowed(me, room.game?.phase);
+  useEffect(() => {
+    if (!open) return;
+    // Availability also changes between snapshots (fall, recovery, protection).
+    // Keep this small local clock scoped to the open picker; no network traffic.
+    const timer = setInterval(() => setClockTick(t => t + 1), 100);
+    return () => clearInterval(timer);
+  }, [open]);
   useEffect(() => {
     const delay = social.nextAttackAt - (Date.now() + offset);
     if (delay <= 0) return;
@@ -65,8 +72,7 @@ export function SocialControls({ room, open, setOpen }: { room: RoomSnapshot; op
         const meta = ANIMATIONS[kind]; const physical = ['attack', 'consent', 'groundTarget'].includes(meta.trigger);
         const needsTarget = ['consent', 'groundTarget'].includes(meta.trigger);
         const targetState = chosen && room.social.players[chosen.id];
-        const targetStage = physicalStage(targetState?.physical, now);
-        const grounded = chosen && (targetStage === 'stun_fall' || targetStage === 'stunned_loop' || targetState?.animation?.kind === 'play_dead' && now >= targetState.animation.startedAt + 500 && now < targetState.animation.endsAt - 500 || !!room.game && !chosen.alive && !chosen.waiting);
+        const grounded = chosen && isGrounded(chosen, targetState, now, room.game?.phase);
         const available = meta.trigger === 'attack' ? hitEligible && now >= social.nextAttackAt : meta.trigger === 'consent' ? chosen && targetState?.acceptsPhysical && socialParticipantAllowed(chosen, room.game?.phase) && socialMovementAllowed(targetState, now) && withinSocialReach(me.position, chosen.position, C.consentRange, false) && !mine : meta.trigger === 'groundTarget' ? grounded && targetState?.acceptsPhysical : true;
         return <button key={kind} disabled={!actionable || physical && !social.acceptsPhysical || needsTarget && !chosen || !available} onClick={() => void act(kind)} title={!available ? 'Rapprochez-vous d’un voisin disponible pour cette interaction' : needsTarget && !chosen ? 'Choisissez un voisin proche' : meta.label}>{meta.label}</button>;
       })}</div>

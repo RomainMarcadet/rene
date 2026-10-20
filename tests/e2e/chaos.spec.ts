@@ -5,7 +5,7 @@ import { AVATAR_SPECIMENS } from '../../apps/web/src/avatar/specimens';
 import { avatarScene } from './avatarScene';
 import { mkdir, writeFile } from 'node:fs/promises';
 test.use({ viewport: { width: 1586, height: 992 }, video: { mode: 'on', size: { width: 1280, height: 800 } }, launchOptions: { args: ['--autoplay-policy=no-user-gesture-required'] } });
-test.afterEach(async ({ page }, info) => { const video = page.video(); await page.close(); if (video && info.status === 'passed') { await mkdir('output/playwright', { recursive: true }); await video.saveAs('output/playwright/v1.5-' + (info.title.startsWith('prototype') ? 'combat' : info.title.startsWith('postures') ? 'catalogue' : info.title.startsWith('stunned') ? 'gameplay' : info.title.startsWith('mobile touch') ? 'mobile-controls' : info.title.startsWith('8 ') ? 'eight' : 'twelve') + '.webm'); } });
+test.afterEach(async ({ page }, info) => { const video = page.video(); await page.close(); if (video && info.status === 'passed') { await mkdir('output/playwright', { recursive: true }); await video.saveAs('output/playwright/v1.5-' + (info.title.startsWith('ground target') ? 'ground-availability' : info.title.startsWith('prototype') ? 'combat' : info.title.startsWith('postures') ? 'catalogue' : info.title.startsWith('stunned') ? 'gameplay' : info.title.startsWith('mobile touch') ? 'mobile-controls' : info.title.startsWith('8 ') ? 'eight' : 'twelve') + '.webm'); } });
 async function state(page: Page): Promise<RoomSnapshot> { return page.evaluate(async () => { const path = '/src/store.ts'; return (await import(path)).useGame.getState().room; }); }
 async function ui(page: Page, command: Command) { return page.evaluate(async command => { const path = '/src/store.ts'; return (await import(path)).send(command); }, command); }
 type Actor = { id: string; socket: Socket; context: APIRequestContext; snapshot?: RoomSnapshot; impacts: Set<string>; contributions: Map<string, number> };
@@ -41,6 +41,27 @@ async function moveTo(a: Actor, x: number, z: number) {
   }
   throw new Error('Movement failed to reach the social test area');
 }
+test('ground target availability advances while the picker stays open and the salon is idle', async ({ page, playwright, baseURL }) => {
+  const f = await setup(page, playwright.request, baseURL!, 4);
+  try {
+    const target = f.actors[0]; await moveTo(target, 4, 1.2);
+    await page.getByRole('button', { name: 'Animations et interactions' }).click();
+    await page.getByRole('button', { name: 'Interactions', exact: true }).click();
+    await page.getByLabel('Cible des interactions').selectOption(target.id);
+    const taunt = page.getByRole('button', { name: 'T-bag cartoon', exact: true });
+    await expect(taunt).toBeDisabled();
+    expect((await send(target, { type: 'player.emote', kind: 'play_dead' })).ok).toBe(true);
+    await expect.poll(async () => (await state(page)).social.players[target.id].animation?.kind).toBe('play_dead');
+    const before = await state(page);
+    // No movement, chat, selection changes or reopening: only time may unlock the button.
+    await expect(taunt).toBeEnabled();
+    const after = await state(page);
+    expect(after.revision).toBe(before.revision);
+    expect(after.social).toEqual(before.social);
+    await taunt.click();
+    await expect.poll(async () => (await state(page)).social.players[before.hostId].animation?.kind).toBe('crouch_taunt');
+  } finally { await f.close(); }
+});
 test('prototype: authoritative punch, fifth impact, fall, recovery and protection with distinct avatars', async ({ page, playwright, baseURL }, info) => {
   test.setTimeout(90000);
   const f = await setup(page, playwright.request, baseURL!, 4);
