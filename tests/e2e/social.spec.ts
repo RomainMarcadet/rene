@@ -14,8 +14,8 @@ async function describe(pages: Page[]) {
   for (let i = 0; i < pages.length; i++) {
     let speaker = -1;
     await expect.poll(async () => {
-      for (const [index, page] of pages.entries()) if (await page.getByLabel('Votre indice', { exact: true }).isVisible()) return speaker = index;
-      return -1;
+      const visible = await Promise.all(pages.map(page => page.getByLabel('Votre indice', { exact: true }).isVisible()));
+      return speaker = visible.findIndex(Boolean);
     }).not.toBe(-1);
     await submitDescription(pages[speaker], `Indice ${i}`, pages);
   }
@@ -43,21 +43,22 @@ test('description turns stay synchronized with delayed commands and expanded ava
   });
   try {
     await expect.poll(() => intercepted).toBe(4);
-    for (const [index, page] of pages.entries()) {
+    // Independent clients prepare concurrently, as they do in a real room.
+    await Promise.all(pages.map(async (page, index) => {
       const room = (await state(page)).room;
       expect(room.players[index].appearance).toEqual(AVATAR_SPECIMENS[index]);
       await page.getByRole('button', { name: 'Je suis prêt →', exact: true }).click();
-    }
+    }));
     await pages[0].getByRole('button', { name: /Lancer la partie/ }).click();
     await describe(pages);
     expect(delayed).toBe(4);
-    for (const page of pages) {
+    await Promise.all(pages.map(async page => {
       await expect(page.locator('.phase-discussion')).toBeVisible();
       const game = (await state(page)).room.game;
       expect(game.descriptions.map((d: { text: string }) => d.text)).toEqual(['Indice 0', 'Indice 1', 'Indice 2', 'Indice 3']);
       expect(game.descriptions.map((d: { playerId: string }) => d.playerId)).toEqual(game.order);
       expect(game.descriptions.every((d: { timedOut: boolean }) => !d.timedOut)).toBe(true);
-    }
+    }));
   } finally { pending.forEach(clearTimeout); await Promise.all(contexts.map(context => context.close())); }
 });
 
