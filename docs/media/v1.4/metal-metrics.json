@@ -1,0 +1,44 @@
+{
+  "samples": 182,
+  "medianFrameMs": 16.69999999999891,
+  "p95FrameMs": 18.399999999999636,
+  "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36",
+  "viewport": [
+    1586,
+    992
+  ],
+  "dpr": 1,
+  "render": {
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Unspecified Version)",
+    "renderDpr": 1,
+    "blocked": false,
+    "focus": "BUTTON",
+    "focusClass": "",
+    "joystick": "transform: translate(0px, 0px);",
+    "perspective": true,
+    "position": [
+      3.627892524416731,
+      14.064256302369042,
+      9.148850620868325
+    ],
+    "orbitYaw": 3.141592653589793,
+    "shot": "group",
+    "area": {
+      "left": 302,
+      "top": 80,
+      "width": 902,
+      "height": 816.953125
+    },
+    "screen": {
+      "x": 839.6357951409908,
+      "y": 575.9197475201424
+    },
+    "local": {
+      "x": 1.6952085996463417,
+      "z": 0.9746498323382874,
+      "yaw": -1.170795582970598
+    },
+    "calls": 442,
+    "triangles": 38724
+  }
+}

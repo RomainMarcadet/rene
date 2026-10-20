@@ -33,6 +33,13 @@ async function eliminate(rooms: Rooms, room: Room, target: string, now: number) 
 }
 
 describe('authoritative room lifecycle', () => {
+  it('rejects movement into the new sofa and lamp without changing the authoritative position', async () => {
+    const { rooms, room } = await fixture(); const p = room.players.get('p0')!;
+    for (const [x, z, dx, dz, time] of [[-2.5, -3.8, -1, 0, 100], [6.2, -2.8, 0, -1, 200]]) {
+      p.position = { x, z, yaw: 0 }; const before = { ...p.position };
+      expect(rooms.move(room, p.id, { x: dx, z: dz }, initialTime + time)).toBe(false); expect(p.position).toEqual(before);
+    }
+  });
   it('requires a connected, ready roster and host authorization', async () => {
     const { rooms, room } = await fixture();
     await expect(rooms.command(room, 'p1', { type: 'game.start' }, initialTime)).rejects.toThrow('hôte');
@@ -188,9 +195,9 @@ describe('authoritative room lifecycle', () => {
     const { rooms, room } = await fixture();
     for (const [i, kind] of (['wave', 'suspect', 'dance'] as const).entries()) {
       const now = initialTime + i * (EMOTE_DURATION_MS + 1);
-      await rooms.command(room, 'p0', { type: 'player.emote', kind }, now);
+      await rooms.command(room, 'p0', { type: 'player.emote', kind }, now, room.social.generation);
       expect(rooms.snapshot(room, now).players[0].emote).toEqual({ kind, until: now + emoteDuration(kind) });
-      await expect(rooms.command(room, 'p0', { type: 'player.emote', kind }, now + 1)).rejects.toThrow('souffle');
+      await expect(rooms.command(room, 'p0', { type: 'player.emote', kind }, now + 1, room.social.generation)).rejects.toThrow('souffle');
       expect(rooms.snapshot(room, now + EMOTE_DURATION_MS).players[0].emote).toBeUndefined();
     }
   });

@@ -34,7 +34,7 @@ async function actor(running: Running, url: string, previous?: { cookie: string;
   return current;
 }
 function send(actor: Actor, command: Command, overrides?: Partial<CommandEnvelope>) {
-  const envelope: CommandEnvelope = { id: crypto.randomUUID(), command, ...(actor.snapshot?.game ? { phaseId: actor.snapshot.game.phaseId } : {}), ...overrides };
+  const envelope: CommandEnvelope = { id: crypto.randomUUID(), command, socialGeneration: actor.snapshot?.social.generation, ...(actor.snapshot?.game ? { phaseId: actor.snapshot.game.phaseId } : {}), ...overrides };
   return new Promise<Ack>((resolve, reject) => {
     actor.socket.timeout(3000).emit('command', envelope, (error: Error | null, ack: Ack) => error ? reject(error) : resolve(ack));
   });
@@ -91,6 +91,51 @@ describe('real Socket.IO clients', () => {
     expect((await send(currentWhite, { type: 'game.guess', word: room.game!.words.civilian }, { phaseId: room.game!.phaseId })).ok).toBe(true);
     await expect.poll(() => actors.every(a => a.snapshot?.game?.phase === 'results')).toBe(true);
     expect(actors.every(a => a.snapshot?.game?.result?.civilWord === room.game!.words.civilian && a.snapshot.game.result.undercoverWord === room.game!.words.undercover)).toBe(true);
+  });
+  it('shares role-independent player marks and keeps them with the same appearance and opening seat after reconnect', async () => {
+    const { running, url, actors, room } = await opened(8);
+    const appearance = { ...DEFAULT_APPEARANCE, hair: 'bun' as const, body: '#F34531' as const };
+    expect((await send(actors[0], { type: 'profile.update', name: 'René distinct', appearance })).ok).toBe(true);
+    expect((await send(actors[0], { type: 'settings.update', settings: { ...room.settings, automaticRoles: false, undercoverCount: 1, whiteCount: 3 } })).ok).toBe(true);
+    for (const a of actors) expect((await send(a, { type: 'player.ready', ready: true })).ok).toBe(true);
+    expect((await send(actors[0], { type: 'game.start' })).ok).toBe(true);
+    await expect.poll(() => actors.every(a => !!a.snapshot?.game)).toBe(true);
+    const marks = { ...room.game!.playerMarks }; const order = [...room.game!.order];
+    expect(new Set(Object.values(marks)).size).toBe(8);
+    expect(room.game!.roles[order[0]]).not.toBe('white');
+    for (const a of actors) {
+      expect(a.snapshot!.game!.playerMarks).toEqual(marks);
+      expect(a.snapshot!.players.find(p => p.id === actors[0].playerId)!.appearance).toEqual(appearance);
+      expect(a.snapshot!.players.every(p => p.role === undefined)).toBe(true);
+      expect(a.snapshot!.game).not.toHaveProperty('roles');
+      expect(a.snapshot!.game).not.toHaveProperty('words');
+    }
+    const old = actors.find(a => a.playerId === order[0])!;
+    old.socket.disconnect();
+    await expect.poll(() => actors.find(a => a !== old)!.snapshot?.players.find(p => p.id === old.playerId)?.connected).toBe(false);
+    await expire(running, room, actors.find(a => a !== old)!);
+    expect(room.game!.order).toEqual(order); expect(room.game!.turnPlayerId).toBe(old.playerId);
+    const resumed = await actor(running, url, old);
+    expect((await send(resumed, { type: 'room.resume' })).ok).toBe(true);
+    await expect.poll(() => resumed.snapshot?.game?.playerMarks).toEqual(marks);
+    expect(resumed.snapshot!.game!.order).toEqual(order);
+    expect((await send(resumed, { type: 'game.describe', text: 'Indice après reconnexion' })).ok).toBe(true);
+    await expect.poll(() => actors.find(a => a !== old)!.snapshot?.game?.turnPlayerId).toBe(order[1]);
+  });
+  it('broadcasts expanded appearances, persists them and normalizes legacy profile commands on reconnect', async () => {
+    const { running, url, actors } = await opened();
+    const appearance = { ...DEFAULT_APPEARANCE, head: 'peanut' as const, hair: 'curls' as const, eyes: 'worried' as const, mouth: 'tooth' as const, nose: 'hook' as const, accessory: 'monocle' as const, accessoryColor: '#8A5DB3' as const };
+    expect((await send(actors[1], { type: 'profile.update', name: 'René nouveau', appearance })).ok).toBe(true);
+    await expect.poll(() => actors.map(a => a.snapshot?.players.find(p => p.id === actors[1].playerId)?.appearance)).toEqual(Array(4).fill(appearance));
+    const session = await running.app.inject({ method: 'GET', url: '/api/session', headers: { cookie: actors[1].cookie } });
+    expect(session.json().appearance).toEqual(appearance);
+    const old = actors[1]; old.socket.disconnect(); const resumed = await actor(running, url, old);
+    await send(resumed, { type: 'room.resume' });
+    await expect.poll(() => resumed.snapshot?.players.find(p => p.id === old.playerId)?.appearance).toEqual(appearance);
+    const { accessoryColor: _color, ...legacy } = DEFAULT_APPEARANCE;
+    expect((await send(resumed, { type: 'profile.update', name: 'René ancien', appearance: legacy } as unknown as Command)).ok).toBe(true);
+    await expect.poll(() => actors[0].snapshot?.players.find(p => p.id === old.playerId)?.appearance).toEqual(DEFAULT_APPEARANCE);
+    expect((await send(resumed, { type: 'profile.update', name: 'René invalide', appearance: { ...appearance, head: 'hacked' } } as unknown as Command)).ok).toBe(false);
   });
   it('accepts authenticated polling without Origin or Fetch Metadata on the configured host', async () => {
     const { running, url } = await server(undefined, true);
@@ -294,4 +339,66 @@ describe('real Socket.IO clients', () => {
     const { running, url } = await server(); await actor(running, url);
     await running.app.close(); apps.splice(apps.indexOf(running), 1);
   }, 5000);
+  it('deduplicates cartoon impacts, preserves clocks/cooldowns on reconnect and rejects stale social generations', async () => {
+    const { running, url, actors, room } = await opened();
+    const [a, b] = actors; room.players.get(a.playerId)!.position = { x: 4, z: 0, yaw: 0 }; room.players.get(b.playerId)!.position = { x: 4, z: 1.2, yaw: Math.PI };
+    const command = { type: 'player.attack', kind: 'punch', targetId: b.playerId } as const;
+    let privateMessages = 0; b.socket.on('private', () => { privateMessages++; });
+    const duplicate = crypto.randomUUID();
+    expect((await send(a, command, { id: duplicate })).ok).toBe(true);
+    expect((await send(a, command, { id: duplicate, phaseId: crypto.randomUUID() })).ok).toBe(true);
+    await new Promise(resolve => setTimeout(resolve, 200)); running.tick();
+    await expect.poll(() => b.snapshot?.social.players[b.playerId].physical?.kind).toBe('hit_reaction');
+    expect(room.players.get(b.playerId)!.social.hits).toHaveLength(1);
+    expect(privateMessages).toBe(0);
+    const attack = a.snapshot!.social.players[a.playerId].animation;
+    a.socket.disconnect(); const resumed = await actor(running, url, a); await send(resumed, { type: 'room.resume' });
+    await expect.poll(() => resumed.snapshot?.social.players[a.playerId].animation?.instanceId).toBe(attack!.instanceId);
+    expect((await send(resumed, { type: 'player.attack', kind: 'slap', targetId: b.playerId })).ok).toBe(false);
+    const generation = room.social.generation;
+    for (const x of [resumed, ...actors.slice(1)]) await send(x, { type: 'player.ready', ready: true });
+    await send(resumed, { type: 'game.start' });
+    expect(room.social.generation).toBe(generation + 1);
+    expect((await send(resumed, command, { id: duplicate, socialGeneration: generation })).ok).toBe(false);
+    for (const x of actors.slice(1)) {
+      expect(x.snapshot?.social).not.toHaveProperty('pending');
+      expect(x.snapshot?.social.players[b.playerId]).not.toHaveProperty('hits');
+      expect(x.snapshot?.game).not.toHaveProperty('roles'); expect(x.snapshot?.game).not.toHaveProperty('words');
+    }
+    const outsider = await actor(running, url);
+    const other = await send(outsider, { type: 'room.create', name: 'Autre salon', appearance: DEFAULT_APPEARANCE }); expect(other.ok).toBe(true);
+    await expect.poll(() => !!outsider.snapshot?.social.generation).toBe(true);
+    expect((await send(outsider, { type: 'player.attack', kind: 'punch', targetId: b.playerId })).ok).toBe(false);
+  });
+  it('reserves command capacity for descriptions and votes when emotes are spammed', async () => {
+    const { running, actors, room } = await opened();
+    for (const a of actors) await send(a, { type: 'player.ready', ready: true });
+    await send(actors[0], { type: 'game.start' }); await expire(running, room, actors[0]);
+    const first = actors.find(a => a.playerId === room.game!.turnPlayerId)!;
+    const phaseId = room.game!.phaseId;
+    const spam = Array.from({ length: 40 }, () => send(first, { type: 'player.emote', kind: 'wave' }, { phaseId }));
+    const business = send(first, { type: 'game.describe', text: 'Indice fictif prioritaire' }, { phaseId });
+    expect((await business).ok).toBe(true);
+    expect((await Promise.all(spam)).filter(a => !a.ok).length).toBeGreaterThan(0);
+    expect(room.game!.descriptions.at(-1)?.text).toBe('Indice fictif prioritaire');
+    while (room.game!.phase === 'description') {
+      const turn = actors.find(a => a.playerId === room.game!.turnPlayerId)!;
+      expect((await send(turn, { type: 'game.describe', text: 'Indice fictif suivant' }, { phaseId: room.game!.phaseId })).ok).toBe(true);
+    }
+    expect((await send(actors[0], { type: 'game.skipDiscussion' }, { phaseId: room.game!.phaseId })).ok).toBe(true);
+    const invalidEmotes = Array.from({ length: 40 }, () => send(first, { type: 'player.emote', kind: 'wave' }));
+    expect((await send(first, { type: 'game.vote', targetId: actors.find(a => a !== first)!.playerId }, { phaseId: room.game!.phaseId })).ok).toBe(true);
+    await Promise.all(invalidEmotes);
+    expect(room.game!.ballots[first.playerId]).toBeTruthy();
+  });
+
+  it('retains the global attack delay even through voluntary leave and rejoin', async () => {
+    const { actors, code } = await opened(); const a = actors[0];
+    expect((await send(a, { type: 'player.attack', kind: 'punch' })).ok).toBe(true);
+    expect((await send(a, { type: 'room.leave' })).ok).toBe(true);
+    expect((await send(a, { type: 'room.join', code, name: 'Retour fictif', appearance: DEFAULT_APPEARANCE })).ok).toBe(true);
+    const ack = await send(a, { type: 'player.attack', kind: 'headbutt' });
+    expect(ack.ok).toBe(false); if (!ack.ok) expect(ack.error).toContain('souffle');
+  });
+
 });

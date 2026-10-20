@@ -1,13 +1,15 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import {
-  DEFAULT_SETTINGS, validComposition, canMoveInPhase, voteSeat, EMOTE_COOLDOWN_MS, emoteDuration, type AvatarAppearance, type ChatMessage, type ChatReaction,
+  ANIMATIONS, DEFAULT_SETTINGS, validComposition, canMoveInPhase, voteSeat, SALON_BOUNDS, walkable, clearWorldPath, spawnPoint, isSocialCommand, socialMovementAllowed, type AvatarAppearance, type ChatMessage, type ChatReaction,
   type Command, type PublicPlayer, type RoomSettings, type RoomSnapshot, type PrivatePlayerState,
 } from '@rene/contracts';
 import { createGame, applyGameAction, chooseWordPair, recordWordSelection, WORD_PAIRS, publicGame, privateGame, type GameState, type WordPair } from '@rene/engine';
+import { createSocial, createSocialPlayer, handleSocial, resetSocial, tickSocial, socialSnapshot, cancelSocialReferences, cancelVoluntary, type SocialRuntime, type ServerSocialPlayer } from './social.js';
 import type { Guest, Persistence } from './persistence.js';
 
-export interface Player extends PublicPlayer { joinedAt: number; disconnectedAt: number | null; lastMoveAt: number; lastChatAt: number; lastEmoteAt: number }
+export interface Player extends PublicPlayer { social: ServerSocialPlayer; joinedAt: number; disconnectedAt: number | null; lastMoveAt: number; lastChatAt: number; lastEmoteAt: number }
 export interface Room {
+  social: SocialRuntime;
   code: string; sessionId: string; revision: number; hostId: string; settings: RoomSettings;
   players: Map<string, Player>; game: GameState | null; chat: Omit<ChatMessage, 'reactions'>[]; chatReactions: Map<string, Map<string, ChatReaction>>; usedWords: string[];
   completedGames: number; voiceGeneration: number; scoredGames: Set<string>; lastOccupiedAt: number;
@@ -35,7 +37,7 @@ export class Rooms {
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code: string;
     do { code = Array.from({ length: 6 }, () => alphabet[randomInt(alphabet.length)]).join(''); } while (this.store.get(code));
-    const room: Room = { code, sessionId: randomUUID(), revision: 0, hostId: guest.id, settings: { ...DEFAULT_SETTINGS }, players: new Map(), game: null, chat: [], chatReactions: new Map(), usedWords: [], completedGames: 0, voiceGeneration: 0, scoredGames: new Set(), lastOccupiedAt: now, persistencePending: false, resultRetryAt: 0, scores: new Map(), formerPlayers: new Map() };
+    const room: Room = { social: createSocial(), code, sessionId: randomUUID(), revision: 0, hostId: guest.id, settings: { ...DEFAULT_SETTINGS }, players: new Map(), game: null, chat: [], chatReactions: new Map(), usedWords: [], completedGames: 0, voiceGeneration: 0, scoredGames: new Set(), lastOccupiedAt: now, persistencePending: false, resultRetryAt: 0, scores: new Map(), formerPlayers: new Map() };
     this.store.set(code, room);
     this.join(room, guest, now);
     return room;
@@ -47,10 +49,9 @@ export class Rooms {
     if (room.players.has(guest.id)) { this.connected(room, guest.id, now); return; }
     if (room.players.size >= 12) throw new Error('Ce salon accueille déjà 12 personnes.');
     const index = room.players.size;
-    const angle = index * Math.PI * 2 / 12;
     const waiting = !editable(room);
     room.formerPlayers.delete(guest.id);
-    room.players.set(guest.id, { id: guest.id, name: guest.name, appearance: guest.appearance, connected: true, ready: false, position: { x: Math.cos(angle) * 4, z: Math.sin(angle) * 4, yaw: 0 }, alive: !waiting, waiting, score: room.scores.get(guest.id) ?? 0, joinedAt: now, disconnectedAt: null, lastMoveAt: now, lastChatAt: -Infinity, lastEmoteAt: -Infinity });
+    room.players.set(guest.id, { social: createSocialPlayer(), id: guest.id, name: guest.name, appearance: guest.appearance, connected: true, ready: false, position: spawnPoint(index), alive: !waiting, waiting, score: room.scores.get(guest.id) ?? 0, joinedAt: now, disconnectedAt: null, lastMoveAt: now, lastChatAt: -Infinity, lastEmoteAt: -Infinity });
     this.playerRooms.set(guest.id, room.code);
     room.lastOccupiedAt = now;
     // Any roster change cancels readiness; waiting arrivals cannot change an active game.
@@ -69,6 +70,7 @@ export class Rooms {
   disconnected(room: Room, playerId: string, now: number) {
     const player = room.players.get(playerId);
     if (!player) return;
+    cancelSocialReferences(room, playerId);
     player.connected = false; player.ready = false; player.disconnectedAt = now;
     room.lastOccupiedAt = now; room.revision++;
   }
@@ -86,9 +88,10 @@ export class Rooms {
     if (!editable(room) && (!room.game?.alive.includes(player.id) || player.waiting) && !room.settings.deadCanSpeak) throw new Error('Les spectateurs et les éliminés écoutent jusqu’à la fin de la partie.');
   }
 
-  async command(room: Room, id: string, command: Command, now: number) {
+  async command(room: Room, id: string, command: Command, now: number, socialGeneration?: number) {
     const player = room.players.get(id);
     if (!player) throw new Error('Tu ne fais plus partie de ce salon.');
+    if (isSocialCommand(command.type)) { handleSocial(room, player, command, now, socialGeneration); room.revision++; return; }
     switch (command.type) {
       case 'player.ready': this.requireLobby(room); player.ready = command.ready; break;
       case 'player.remove': {
@@ -115,6 +118,7 @@ export class Rooms {
         if (!players.every(p => p.connected && p.ready)) throw new Error('Tout le monde doit être connecté et prêt.');
         const pair = chooseWordPair(room.settings, room.usedWords, this.random, this.wordPairs);
         room.game = createGame({ id: randomUUID(), playerIds: players.map(p => p.id), settings: room.settings, pair, now, random: this.random });
+        resetSocial(room);
         recordWordSelection(room.usedWords, pair.id);
         room.chat = []; room.chatReactions.clear();
         for (const p of players) { p.waiting = false; p.alive = true; p.ready = false; }
@@ -125,6 +129,7 @@ export class Rooms {
         this.requireHost(room, id);
         if (room.game?.phase !== 'results') throw new Error('La partie n’est pas terminée.');
         if (room.persistencePending) throw new Error('Les résultats sont en cours de sauvegarde. Réessaie dans un instant.');
+        resetSocial(room);
         room.game = null; room.chat = []; room.chatReactions.clear(); room.formerPlayers.clear(); room.voiceGeneration++;
         if (room.completedGames >= room.settings.roundsPerSession) {
           room.sessionId = randomUUID(); room.completedGames = 0; room.scoredGames.clear(); room.scores.clear();
@@ -158,10 +163,6 @@ export class Rooms {
         room.chat = room.chat.slice(-100);
         for (const messageId of room.chatReactions.keys()) if (!room.chat.some(message => message.id === messageId)) room.chatReactions.delete(messageId);
         break;
-      case 'player.emote':
-        if (!editable(room) && !room.game?.alive.includes(id)) throw new Error('Les éliminés restent discrets pendant la partie.');
-        if (now - player.lastEmoteAt < EMOTE_COOLDOWN_MS) throw new Error('Laisse ton avatar reprendre son souffle.');
-        player.lastEmoteAt = now; player.emote = { kind: command.kind, until: now + emoteDuration(command.kind) }; break;
       default: throw new Error('Action indisponible.');
     }
     room.revision++;
@@ -171,7 +172,9 @@ export class Rooms {
     if (!room.game || room.game.phase === 'results') throw new Error('Aucune partie en cours.');
     const oldAlive = room.game.alive.length;
     const wasMoving = canMoveInPhase(room.game.phase);
+    const oldPhaseId = room.game.phaseId;
     room.game = applyGameAction(room.game, action, now, this.random);
+    if (!canMoveInPhase(room.game.phase) && oldPhaseId !== room.game.phaseId) resetSocial(room);
     if (wasMoving && !canMoveInPhase(room.game.phase)) {
       // Authoritative placement, retained after the vote: no return to stale lobby poses.
       room.game.alive.forEach((id, index, living) => {
@@ -201,11 +204,12 @@ export class Rooms {
 
   async leave(room: Room, playerId: string, now: number) {
     if (room.game && room.game.phase !== 'results' && room.game.playerIds.includes(playerId)) await this.gameAction(room, { type: 'leave', playerId }, now);
+    cancelSocialReferences(room, playerId, true);
     const player = room.players.get(playerId);
     if (room.game?.playerIds.includes(playerId) && player) room.formerPlayers.set(playerId, { ...player, alive: false, connected: false, ready: false });
     room.players.delete(playerId); this.playerRooms.delete(playerId); room.voiceGeneration++; room.revision++;
     this.transferHost(room, now, true);
-    if (room.players.size === 0 && !room.persistencePending) this.store.delete(room.code);
+    if (room.players.size === 0 && !room.persistencePending) { resetSocial(room); this.store.delete(room.code); }
     if (editable(room)) for (const player of room.players.values()) player.ready = false;
   }
 
@@ -214,34 +218,38 @@ export class Rooms {
     if (room.game?.deadline && room.game.deadline <= now && room.game.phase !== 'results') {
       await this.gameAction(room, { type: 'timeout' }, now); changed = true;
     }
+    changed = tickSocial(room, now) || changed;
     if (room.persistencePending) changed = await this.persistResult(room, now) || changed;
     if ([...room.players.values()].some(p => p.connected)) room.lastOccupiedAt = now;
     else if (!room.persistencePending && (room.players.size === 0 || now - room.lastOccupiedAt > 30 * 60_000)) {
       for (const id of room.players.keys()) this.playerRooms.delete(id);
-      this.store.delete(room.code);
+      resetSocial(room); this.store.delete(room.code);
     }
     return changed;
   }
 
   move(room: Room, id: string, direction: { x: number; z: number }, now: number) {
     const player = room.players.get(id);
-    if (!player || !player.connected || !canMoveInPhase(room.game?.phase)) return false;
+    if (!player || !player.connected || !canMoveInPhase(room.game?.phase) || !socialMovementAllowed(player.social, now) || (player.social.animation?.sharedInteractionId && now < player.social.animation.endsAt)) return false;
     if (!Number.isFinite(direction.x) || !Number.isFinite(direction.z) || Math.abs(direction.x) > 1 || Math.abs(direction.z) > 1) return false;
     const dt = Math.min(0.12, Math.max(0, (now - player.lastMoveAt) / 1000));
     if (dt < 0.035) return false;
     player.lastMoveAt = now;
     const magnitude = Math.max(1, Math.hypot(direction.x, direction.z));
-    const x = Math.max(-7, Math.min(7, player.position.x + direction.x / magnitude * dt * 3.2));
-    const z = Math.max(-5, Math.min(5, player.position.z + direction.z / magnitude * dt * 3.2));
-    // Shared scene table has a 2.6 x 1.6 footprint; keep avatars outside it.
-    if (Math.abs(x) < 1.65 && Math.abs(z) < 1.15) return false;
+    const x = Math.max(-SALON_BOUNDS.x, Math.min(SALON_BOUNDS.x, player.position.x + direction.x / magnitude * dt * 3.2));
+    const z = Math.max(-SALON_BOUNDS.z, Math.min(SALON_BOUNDS.z, player.position.z + direction.z / magnitude * dt * 3.2));
+    // Swept movement and social line of sight share the visible furniture footprints.
+    if (!walkable({ x, z }) || !clearWorldPath(player.position, { x, z })) return false;
+    if ((direction.x || direction.z) && player.social.animation && !ANIMATIONS[player.social.animation.kind].moving) {
+      cancelVoluntary(room, player); room.revision++;
+    }
     player.position = { x, z, yaw: direction.x || direction.z ? Math.atan2(direction.x, direction.z) : player.position.yaw };
     return true;
   }
 
   snapshot(room: Room, now: number): RoomSnapshot {
     return {
-      code: room.code, revision: room.revision, hostId: room.hostId, settings: { ...room.settings },
+      social: socialSnapshot(room, now), code: room.code, revision: room.revision, hostId: room.hostId, settings: { ...room.settings },
       players: [...room.players.values(), ...room.formerPlayers.values()].map(p => {
         const alive = room.game && !p.waiting ? room.game.alive.includes(p.id) : p.alive;
         const role = room.game && (!alive || room.game.phase === 'results') && !p.waiting ? room.game.roles[p.id] : undefined;

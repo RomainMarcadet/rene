@@ -10,7 +10,7 @@ describe('eliminated role announcement', () => {
   it.each<[Role, string]>([['civilian', 'C’ÉTAIT UN CIVIL !'], ['undercover', 'C’ÉTAIT UN UNDERCOVER !'], ['white', 'C’ÉTAIT MR. WHITE !']])('announces %s with the eliminated portrait without changing the profile', (role, text) => {
     const player = { ...participant, role }; const before = structuredClone(player);
     const html = render(player);
-    expect(html).toContain('René A ÉTÉ ÉLIMINÉ.'); expect(html).toContain(text);
+    expect(html.replace(/<[^>]*>/g, '')).toContain('René A ÉTÉ ÉLIMINÉ.'); expect(html).toContain(text);
     expect(html).toContain('Portrait éliminé · yeux rouges'); expect(html).toContain('role="status"');
     expect(player).toEqual(before);
   });

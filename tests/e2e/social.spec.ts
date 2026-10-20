@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
-import { joinFour } from './helpers';
+import { joinFour, showPanel, submitDescription } from './helpers';
+import { AVATAR_SPECIMENS } from '../../apps/web/src/avatar/specimens';
 
 async function state(page: Page) {
   return page.evaluate(async () => {
@@ -16,10 +17,49 @@ async function describe(pages: Page[]) {
       for (const [index, page] of pages.entries()) if (await page.getByLabel('Votre indice', { exact: true }).isVisible()) return speaker = index;
       return -1;
     }).not.toBe(-1);
-    await pages[speaker].getByLabel('Votre indice', { exact: true }).fill(`Indice ${i}`);
-    await pages[speaker].getByRole('button', { name: /Valider mon indice/ }).click();
+    await submitDescription(pages[speaker], `Indice ${i}`, pages);
   }
 }
+
+test('description turns stay synchronized with delayed commands and expanded avatars', async ({ browser, baseURL }) => {
+  let intercepted = 0; let delayed = 0;
+  const pending = new Set<ReturnType<typeof setTimeout>>();
+  const { contexts, pages } = await joinFour(browser, baseURL!, 3, async (context, index) => {
+    await context.addInitScript(appearance => localStorage.setItem('rene-profile', JSON.stringify({ name: 'Spécimen', appearance })), AVATAR_SPECIMENS[index]);
+    await context.routeWebSocket(url => url.pathname === '/socket.io/', socket => {
+      intercepted++;
+      const server = socket.connectToServer();
+      socket.onMessage(message => {
+        const packet = typeof message === 'string' ? message.match(/^42\d*(\[.*)$/s) : null;
+        const [event, envelope] = packet ? JSON.parse(packet[1]) : [];
+        if (event === 'command' && envelope?.command?.type === 'game.describe') {
+          delayed++;
+          // Real server, ordered messages: expose the window between click and confirmation.
+          const timer = setTimeout(() => { pending.delete(timer); server.send(message); }, 400);
+          pending.add(timer);
+        } else server.send(message);
+      });
+    });
+  });
+  try {
+    await expect.poll(() => intercepted).toBe(4);
+    for (const [index, page] of pages.entries()) {
+      const room = (await state(page)).room;
+      expect(room.players[index].appearance).toEqual(AVATAR_SPECIMENS[index]);
+      await page.getByRole('button', { name: 'Je suis prêt →', exact: true }).click();
+    }
+    await pages[0].getByRole('button', { name: /Lancer la partie/ }).click();
+    await describe(pages);
+    expect(delayed).toBe(4);
+    for (const page of pages) {
+      await expect(page.locator('.phase-discussion')).toBeVisible();
+      const game = (await state(page)).room.game;
+      expect(game.descriptions.map((d: { text: string }) => d.text)).toEqual(['Indice 0', 'Indice 1', 'Indice 2', 'Indice 3']);
+      expect(game.descriptions.map((d: { playerId: string }) => d.playerId)).toEqual(game.order);
+      expect(game.descriptions.every((d: { timedOut: boolean }) => !d.timedOut)).toBe(true);
+    }
+  } finally { pending.forEach(clearTimeout); await Promise.all(contexts.map(context => context.close())); }
+});
 
 test('four clients react, unanimously start voting and reveal White before a tolerant guess and replay', async ({ browser, baseURL }) => {
   test.setTimeout(180000);
@@ -40,6 +80,7 @@ test('four clients react, unanimously start voting and reveal White before a tol
     const word = initial.find(s => s.secret.word !== null)!.secret.word as string;
     expect(white).toBeGreaterThanOrEqual(0);
     await describe(pages);
+    await showPanel(pages[3], 'Discussion');
     await host.getByLabel('Message au salon').fill('Je soupçonne tout le monde, surtout Lou.');
     await host.getByRole('button', { name: 'Envoyer le message' }).click();
     const up = (page: Page) => page.getByRole('button', { name: 'Soutenir le message de Camille', exact: true });
@@ -82,7 +123,10 @@ test('four clients react, unanimously start voting and reveal White before a tol
       await expect(page.locator('.role-reveal')).toContainText('C’ÉTAIT MR. WHITE !');
       const card = page.locator('.participants .eliminated');
       await expect(card).toContainText(names[white]); await expect(card).toContainText('ÉLIMINÉ'); await expect(card).toContainText('MR. WHITE');
-      await expect(card).toHaveCSS('background-color', 'rgb(243, 69, 49)');
+      await expect(card.locator('.elimination-tag')).toHaveCSS('background-color', 'rgb(243, 69, 49)');
+      const mark = (await state(page)).room.game.playerMarks[vote.players[white].id];
+      await expect(card.locator(`.player-identity[data-player-mark="${mark}"]`)).toHaveCount(1);
+      expect(await card.evaluate(node => getComputedStyle(node).borderLeftColor)).toBe(await card.locator('.player-token').evaluate(node => getComputedStyle(node).backgroundColor));
       await expect(page.locator('.participants li:not(.eliminated) .revealed-role')).toHaveCount(0);
     }));
     await expect(up(pages[white])).toBeDisabled();

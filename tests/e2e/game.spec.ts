@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { joinFour } from './helpers';
+import { joinFour, showPanel, submitDescription } from './helpers';
 
 async function pose(page: Page, name: string) {
   return page.evaluate(async name => {
@@ -11,7 +11,7 @@ async function walk(page: Page, observer: Page, name: string) {
   await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
   const before = await pose(page, name);
   await page.keyboard.down('s');
-  try { await expect.poll(async () => (await pose(observer, name)).z).toBeGreaterThan(before.z + .15); }
+  try { await expect.poll(async () => { const p = await pose(observer, name); return Math.hypot(p.x - before.x, p.z - before.z); }).toBeGreaterThan(.15); }
   finally { await page.keyboard.up('s'); }
 }
 
@@ -52,15 +52,20 @@ test('four independent browsers finish a game, reconnect and prepare a replay', 
           else await expect(page.getByLabel('Votre indice', { exact: true })).toHaveCount(0);
         }));
         if (cycle === 0 && turn === 0) await pages[speaker].screenshot({ path: 'output/playwright/active-turn.png', fullPage: true });
-        const input = pages[speaker].getByLabel('Votre indice', { exact: true });
-        await input.fill(`Indice ${cycle + 1} ${speaker + 1}`);
-        await pages[speaker].getByRole('button', { name: /Valider mon indice/ }).click();
-        await expect(input).not.toBeVisible();
+        await submitDescription(pages[speaker], `Indice ${cycle + 1} ${speaker + 1}`, pages);
       }
       for (const page of pages) {
         await expect(page.locator('.latest-clue')).toContainText(`Indice ${cycle + 1}`);
         await expect(page.locator('.history-rounds section').first()).toHaveAttribute('aria-label', `Indices du tour ${cycle + 1}`);
-        expect(await page.locator('.history-rounds section').first().locator('li strong').allTextContents()).toEqual(seenTurns.slice(-alive.size));
+        expect(await page.locator('.current-round .player-name').allTextContents()).toEqual(seenTurns.slice(-alive.size));
+        if (cycle > 0) {
+          await showPanel(page, 'Indices');
+          await page.getByRole('button', { name: /Tours passés/ }).click();
+          const history = page.getByRole('dialog', { name: 'Les tours précédents' });
+          await expect(history.getByRole('region', { name: 'Indices du tour 1' })).toBeVisible();
+          expect(await history.locator('.player-name').allTextContents()).toEqual(seenTurns.slice(0, 4));
+          await page.keyboard.press('Escape'); await expect(history).toHaveCount(0);
+        }
       }
       if (cycle === 0) await walk(pages[0], pages[1], names[0]);
       await pages[0].getByRole('button', { name: /Passer au vote/ }).click();
@@ -78,7 +83,7 @@ test('four independent browsers finish a game, reconnect and prepare a replay', 
       for (const page of pages) {
         const card = page.locator('.participants li.eliminated').filter({ hasText: names[target] });
         await expect(card).toContainText('ÉLIMINÉ');
-        await expect(card).toHaveCSS('background-color', 'rgb(243, 69, 49)');
+        await expect(card.locator('.elimination-tag')).toHaveCSS('background-color', 'rgb(243, 69, 49)');
         await expect(card.getByRole('img', { name: 'Portrait éliminé · yeux rouges' })).toBeVisible();
       }
       await expect(pages[0].locator('.phase-results, .phase-description')).toBeVisible({ timeout: 6000 });
@@ -109,12 +114,15 @@ test('mobile creation, local avatar persistence and text conversation', async ({
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.getByRole('button', { name: /Ça, c’est moi/ }).click();
     await page.getByRole('button', { name: /Créer un salon/ }).click();
+    await showPanel(page, 'Suspects');
     await expect(page.getByRole('heading', { name: /Les suspects/ })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.getByRole('button', { name: /^Menu/ }).click();
     await page.getByRole('button', { name: 'Comment jouer ?', exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.getByRole('button', { name: 'Fermer', exact: true }).click();
     await page.reload();
+    await showPanel(page, 'Suspects');
     await expect(page.getByText('Renée mobile (vous)', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Je suis prêt →', exact: true })).toBeVisible();
   } finally { await context.close(); }

@@ -63,7 +63,7 @@ Les descriptions et messages sont bornés et rendus comme texte React. Les comma
 
 ## Bibliothèque V1.4
 
-Le catalogue serveur contient 1 620 paires, dont 1 500 ajouts dans quinze catégories. Les données JSON portent des identifiants stables et deux axes éditoriaux privés. Un audit refuse les doublons, inversions, variantes normalisées et métadonnées invalides. Le tirage est uniforme parmi les entrées filtrées hors de la fenêtre récente ; l'historique de salle est borné à 512 identifiants, sans exclusion permanente. Les projections de partie ne portent aucune métadonnée de la paire tirée. Vite bloque les sources serveur et le build client est contrôlé. Les tests navigateur utilisent un catalogue fictif. Voir le [rapport V1.4 sans spoiler](v1.4.md).
+Le catalogue serveur contient 1 620 paires, dont 1 500 ajouts dans quinze catégories. Les données JSON portent des identifiants stables et deux axes éditoriaux privés. Un audit refuse les doublons, inversions, variantes normalisées et métadonnées invalides. Le tirage est uniforme parmi les entrées filtrées hors de la fenêtre récente ; l'historique de salle est borné à 512 identifiants, sans exclusion permanente. Les projections de partie ne portent aucune métadonnée de la paire tirée. Vite bloque les sources serveur et le build client est contrôlé. Les tests navigateur utilisent un catalogue fictif. Voir le [rapport V1.4 sans spoiler](word-library-v1.4.md).
 
 ## Persistance et audio
 
@@ -94,3 +94,12 @@ La présentation du tour et des éliminés dérive uniquement de `RoomSnapshot`.
 La décision de `guess` utilise `isAcceptableWhiteGuess`, dans le moteur exclusivement. Normalisation Unicode, formes grammaticales éditoriales et fautes explicites sont acceptées ; les autres cas ne sont pas déduits d’une distance de caractères. Aucun service externe, dictionnaire complet ou LLM. Le serveur conserve son unique tentative et ses scores. `RoleReveal` réutilise seulement le rôle public d’un éliminé pendant élimination/devinette, et les cartes conservent ce rôle jusqu’au rejeu.
 
 Voir [le rapport V1.2](v1.2.md) pour les cas limites, les tests et la politique d’extension du validateur. L’infrastructure et le port HTTP 8080 sont inchangés.
+
+
+## Salon immersif — The Living Room
+
+Le hub utilise une caméra perspective locale. `scene/camera/CameraDirector` suit les clés publiques de partie/phase/cible et `findClearArea`, sans événement caméra ni transformation autoritaire du joueur. Les entrées clavier et tactiles partagent `cameraRelative` ; leurs directions restent validées par le serveur.
+
+`packages/contracts/src/world.ts` est la source des empreintes du mobilier, des murs et des apparitions. Les déplacements utilisent une vérification de segment et de destination ; les interactions sociales partagent la même ligne de vue. `voteSeat` et les règles du moteur restent inchangés. Les composants `scene/world` rendent ces volumes en mobilier procédural original. La caméra se rétracte contre le mobilier ; les murs côté caméra s’effacent progressivement.
+
+La personnalité est un champ compatible de l’apparence (défaut historique impassible). La couche `poses/personality` ne modifie que des poses secondaires locales. Le vocal fournit uniquement son signal public d’activité ; aucune analyse ni nouvelle connexion. Voir [le rapport Living Room](v1.4.md).

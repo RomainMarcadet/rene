@@ -1,34 +1,55 @@
 import { useEffect, useRef, useState } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { MathUtils, type OrthographicCamera } from 'three';
+import { Canvas } from '@react-three/fiber';
 import { canMoveInPhase, type RoomSnapshot } from '@rene/contracts';
-import { move, send, useGame } from '../store';
+import { send, useGame } from '../store';
+import { speakerGaze } from './poses/personality';
 import { Avatar } from './Avatar';
-import { Salon } from './Salon';
-import { isEditing } from '../keyboard';
-export function useReducedMotion() { const [reduced, setReduced] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches); useEffect(() => { const media = matchMedia('(prefers-reduced-motion: reduce)'); const update = () => setReduced(media.matches); media.addEventListener('change', update); return () => media.removeEventListener('change', update); }, []); return reduced; }
-function Camera({ room }: { room: RoomSnapshot }) {
-  const { camera, size } = useThree();
-  useEffect(() => { const cam = camera as OrthographicCamera; cam.zoom = Math.min(size.width / 20, size.height / 13.3); cam.updateProjectionMatrix(); }, [camera, size]);
-  const lookAt = useRef({ x: 0, z: 0 });
-  useFrame((_state, dt) => { const speaker = room.game?.phase === 'description' ? room.players.find(p => p.id === room.game?.turnPlayerId) : null; lookAt.current.x = MathUtils.damp(lookAt.current.x, (speaker?.position.x ?? 0) * .2, 2, dt); lookAt.current.z = MathUtils.damp(lookAt.current.z, (speaker?.position.z ?? 0) * .2, 2, dt); camera.lookAt(lookAt.current.x, .4, lookAt.current.z); });
-  return null;
-}
-export default function Hub({ room, playerId, speaking }: { room: RoomSnapshot; playerId: string; speaking: string[] }) {
-  const keys = useRef(new Set<string>()); const touch = useRef({ x: 0, z: 0 }); const reduced = useReducedMotion(); const offset = useGame(s => s.offset); const voteTarget = useGame(s => s.secret?.voteTarget); const freeMovement = canMoveInPhase(room.game?.phase);
+import { World } from './world/World';
+import { CameraDirector } from './camera/CameraDirector';
+import { ResolutionBudget } from './camera/ResolutionBudget';
+import { useHubControls, controlsBlocked } from './camera/useHubControls';
+import { Joystick } from './camera/Joystick';
+import { shotKey, TPS, type OrbitState } from './camera/math';
+import type { ClearArea } from '../components/useRoomViewport';
+import { useReducedMotion } from './useReducedMotion';
+export { useReducedMotion } from './useReducedMotion';
+export default function Hub({ room, playerId, speaking, clearArea, compact, controlsVisible, paused = false }: { room: RoomSnapshot; playerId: string; speaking: string[]; clearArea: ClearArea; compact: boolean; controlsVisible: boolean; paused?: boolean }) {
+  const reduced = useReducedMotion(); const offset = useGame(s => s.offset); const voteTarget = useGame(s => s.secret?.voteTarget);
+  const orbit = useRef<OrbitState>({ yaw: Math.PI, viewYaw: Math.PI, pitch: TPS.pitch, interrupted: '', overview: false });
+  const [quality, setQuality] = useState(1);
+  const [overview, setOverview] = useState(false); const drag = useRef<{ id: number; x: number; y: number } | null>(null);
+  const vote = !canMoveInPhase(room.game?.phase); const me = room.players.find(p => p.id === playerId);
+  const touch = useHubControls(room, orbit, controlsVisible, () => recenter());
+  useEffect(() => { if (!controlsVisible || vote) drag.current = null; }, [controlsVisible, vote]);
   useEffect(() => {
-    const blocked = (target: EventTarget | null) => isEditing(target) || !!document.querySelector('dialog[open]');
-    const down = (event: KeyboardEvent) => { if (blocked(event.target)) return; const key = event.key.toLowerCase(); if (['z', 'q', 's', 'd', 'w', 'a', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) { event.preventDefault(); keys.current.add(key); } };
-    const up = (event: KeyboardEvent) => keys.current.delete(event.key.toLowerCase()); const reset = () => { keys.current.clear(); touch.current = { x: 0, z: 0 }; };
-    const focus = () => { if (blocked(document.activeElement)) reset(); };
-    window.addEventListener('keydown', down); window.addEventListener('keyup', up); window.addEventListener('blur', reset); document.addEventListener('visibilitychange', reset); document.addEventListener('focusin', focus);
-    const interval = setInterval(() => { if (!freeMovement || blocked(document.activeElement)) { reset(); return; } const pressed = (...values: string[]) => values.some(key => keys.current.has(key)); let x = touch.current.x + Number(pressed('d', 'arrowright')) - Number(pressed('q', 'a', 'arrowleft')); let z = touch.current.z + Number(pressed('s', 'arrowdown')) - Number(pressed('z', 'w', 'arrowup')); const length = Math.hypot(x, z); if (length) { x /= length; z /= length; move(x, z); } }, 67);
-    return () => { clearInterval(interval); window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('blur', reset); document.removeEventListener('visibilitychange', reset); document.removeEventListener('focusin', focus); reset(); };
-  }, [freeMovement]);
-  const vote = room.game?.phase === 'vote' || room.game?.phase === 'tiebreak';
-  const me = room.players.find(p => p.id === playerId);
-  return <><div className="hub-canvas"><Canvas orthographic camera={{ position: [11, 13, 17], zoom: 27, near: .1, far: 100 }} dpr={[1, 1.5]} gl={{ antialias: true, alpha: false, powerPreference: 'low-power' }} fallback={<div className="scene-fallback">La 3D est indisponible. La partie reste accessible ci-dessous.</div>}><Salon /><Camera room={room} />{room.players.map(p => {
-    const selectable = vote && !voteTarget && me?.alive && !me.waiting && p.id !== playerId && room.game!.voteCandidates.includes(p.id);
-    return <Avatar key={p.id} appearance={p.appearance} name={p.name} position={[p.position.x, 0, p.position.z]} yaw={p.position.yaw} seated={vote} selected={p.id === playerId || p.id === room.game?.turnPlayerId} speaking={speaking.includes(p.id)} dead={!p.alive && !p.waiting} winner={room.game?.phase === 'results' && room.game.result?.winnerIds.includes(p.id)} emote={p.emote?.kind} emoteUntil={p.emote ? p.emote.until - offset : undefined} onClick={selectable ? () => void send({ type: 'game.vote', targetId: p.id }) : undefined} reducedMotion={reduced} />;
-  })}</Canvas></div>{freeMovement && <div className="touch-pad" aria-label="Déplacements tactiles">{([{ name: 'Haut', x: 0, z: -1, icon: '↑' }, { name: 'Gauche', x: -1, z: 0, icon: '←' }, { name: 'Bas', x: 0, z: 1, icon: '↓' }, { name: 'Droite', x: 1, z: 0, icon: '→' }]).map(direction => <button key={direction.name} className={`touch-${direction.name.toLowerCase()}`} aria-label={`Se déplacer : ${direction.name}`} onPointerDown={event => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); touch.current = direction; }} onPointerUp={() => { touch.current = { x: 0, z: 0 }; }} onPointerCancel={() => { touch.current = { x: 0, z: 0 }; }} onLostPointerCapture={() => { touch.current = { x: 0, z: 0 }; }}>{direction.icon}</button>)}</div>}</>;
+    const reset = () => { drag.current = null; }; const focus = () => { if (controlsBlocked(document.activeElement)) reset(); };
+    window.addEventListener('blur', reset); window.addEventListener('resize', reset); window.visualViewport?.addEventListener('resize', reset); document.addEventListener('visibilitychange', reset); document.addEventListener('focusin', focus);
+    return () => { window.removeEventListener('blur', reset); window.removeEventListener('resize', reset); window.visualViewport?.removeEventListener('resize', reset); document.removeEventListener('visibilitychange', reset); document.removeEventListener('focusin', focus); };
+  }, []);
+  const recenter = () => { orbit.current.yaw = (me?.position.yaw ?? 0) + Math.PI; orbit.current.pitch = TPS.pitch; orbit.current.interrupted = shotKey(room.game); orbit.current.overview = false; setOverview(false); };
+  return <><div className="hub-canvas" onPointerDown={e => {
+    if (vote || !controlsVisible || document.querySelector('dialog[open]') || e.button !== 0 || drag.current || !(e.target instanceof HTMLCanvasElement)) return;
+    e.target.focus({ preventScroll: true });
+    e.currentTarget.setPointerCapture(e.pointerId); drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  }} onPointerMove={e => {
+    const d = drag.current; if (!d || vote || d.id !== e.pointerId || !controlsVisible || controlsBlocked(document.activeElement)) return;
+    orbit.current.yaw -= (e.clientX - d.x) * .006;
+    orbit.current.pitch = Math.max(TPS.minPitch, Math.min(TPS.maxPitch, orbit.current.pitch + (e.clientY - d.y) * .004));
+    orbit.current.interrupted = shotKey(room.game); d.x = e.clientX; d.y = e.clientY;
+  }} onPointerUp={e => { if (drag.current?.id === e.pointerId) drag.current = null; }} onPointerCancel={e => { if (drag.current?.id === e.pointerId) drag.current = null; }} onLostPointerCapture={e => { if (drag.current?.id === e.pointerId) drag.current = null; }}>
+    <Canvas frameloop={paused ? 'demand' : 'always'} onCreated={({ gl }) => { gl.domElement.tabIndex = 0; gl.domElement.setAttribute('aria-label', 'Scène : glisser pour regarder, ZQSD ou WASD pour marcher, R pour recentrer'); }} camera={{ position: [4, 4, -6], fov: TPS.fov, near: .08, far: 180 }} dpr={Math.max(1, Math.min(1.5, window.devicePixelRatio || 1)) * quality} gl={{ antialias: true, alpha: false, powerPreference: 'low-power' }} fallback={<div className="scene-fallback">La 3D est indisponible. La partie reste accessible dans les panneaux.</div>}>
+      <ResolutionBudget quality={quality} paused={paused} onQuality={setQuality} />
+      <World /><CameraDirector room={room} playerId={playerId} area={clearArea} orbit={orbit} reduced={reduced} />
+      {room.players.map(p => {
+        const selectable = vote && !voteTarget && me?.alive && !me.waiting && p.id !== playerId && room.game!.voteCandidates.includes(p.id);
+        return <Avatar key={p.id} identity={p.id} gaze={speakerGaze(p, room.players, speaking)} appearance={p.appearance} name={p.name} mark={room.game?.playerMarks[p.id]} position={[p.position.x, 0, p.position.z]} yaw={p.position.yaw} seated={vote} selected={p.id === playerId || p.id === room.game?.turnPlayerId} speaking={speaking.includes(p.id)} dead={!p.alive && !p.waiting} winner={room.game?.phase === 'results' && room.game.result?.winnerIds.includes(p.id)} emote={p.emote?.kind} emoteUntil={p.emote ? p.emote.until - offset : undefined} onClick={selectable ? () => void send({ type: 'game.vote', targetId: p.id }) : undefined} reducedMotion={reduced} social={room.social.players[p.id]} serverOffset={offset} phase={room.game?.phase} recipient={room.social.interactions.some(i => i.toId === p.id && i.state === 'active')} partner={room.players.find(other => other.id === room.social.players[p.id]?.animation?.targetId)?.position} />;
+      })}
+    </Canvas>
+  </div>
+  {controlsVisible && !vote && <div className="camera-controls" style={{ left: Math.max(12, clearArea.left + 8), top: Math.max(80, clearArea.top + (!compact && clearArea.left < 150 && clearArea.top < 160 ? 84 : 8)) }}>
+    <button aria-label="Recentrer la caméra" title="Recentrer · R" onClick={recenter}>◎<span>Moi · R</span></button>
+    {!compact && <button aria-label="Vue collective" aria-pressed={overview} onClick={() => { setOverview(!overview); orbit.current.overview = !overview; }}>▦<span>Ensemble</span></button>}
+  </div>}
+  <Joystick value={touch} visible={!vote && controlsVisible} area={clearArea} />
+  </>;
 }
