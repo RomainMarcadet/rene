@@ -1,4 +1,7 @@
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useRef, type MutableRefObject } from 'react';
+import { useFrame } from '@react-three/fiber';
+import type { Group } from 'three';
+import type { FaceMotion } from '../scene/poses/personality';
 import { BoxGeometry, ConeGeometry, CylinderGeometry, MeshLambertMaterial, SphereGeometry, TorusGeometry } from 'three';
 import type { AvatarAppearance } from '@rene/contracts';
 import { avatarTone, buildAvatarModel } from './model';
@@ -19,9 +22,16 @@ export function avatarMaterial(color: string) {
 function PartMesh({ part, appearance, eliminated }: { part: Part; appearance: AvatarAppearance; eliminated: boolean }) {
   return <mesh geometry={part.kind === 'torus' && part.arc === Math.PI ? avatarGeometry.arc : avatarGeometry[part.kind]} material={avatarMaterial(avatarTone(part.tone, appearance, eliminated))} position={part.at} scale={part.scale} rotation={[0, 0, part.tilt ?? 0]} dispose={null} />;
 }
-export const AvatarHead = memo(function AvatarHead({ appearance, eliminated = false }: { appearance: AvatarAppearance; eliminated?: boolean }) {
+export const AvatarHead = memo(function AvatarHead({ appearance, eliminated = false, motion }: { appearance: AvatarAppearance; eliminated?: boolean; motion?: MutableRefObject<FaceMotion> }) {
   const model = useMemo(() => buildAvatarModel(appearance, eliminated), [appearance, eliminated]);
+  const eyes = useRef<Group>(null); const mouth = useRef<Group>(null);
+  useFrame(() => {
+    if (eyes.current) { eyes.current.scale.y = eliminated ? 1 : motion?.current.blink ?? 1; eyes.current.position.x = eliminated ? 0 : motion?.current.look ?? 0; }
+    if (mouth.current) mouth.current.scale.y = 1 + (eliminated ? 0 : motion?.current.talk ?? 0);
+  });
   return <group name={`appearance:${appearance.head}:${appearance.hair}:${appearance.eyes}:${appearance.mouth}:${appearance.nose}:${appearance.accessory}`}>
-    {model.parts.map((part, index) => <PartMesh key={index} part={part} appearance={appearance} eliminated={eliminated} />)}
+    {[...model.head.parts, ...model.hair, ...model.nose, ...model.accessory].map((part, index) => <PartMesh key={index} part={part} appearance={appearance} eliminated={eliminated} />)}
+    <group ref={eyes}>{model.eyes.map((part, index) => <PartMesh key={index} part={part} appearance={appearance} eliminated={eliminated} />)}</group>
+    <group ref={mouth}>{model.mouth.map((part, index) => <PartMesh key={index} part={part} appearance={appearance} eliminated={eliminated} />)}</group>
   </group>;
 });
