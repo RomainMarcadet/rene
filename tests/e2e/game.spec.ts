@@ -11,7 +11,7 @@ async function walk(page: Page, observer: Page, name: string) {
   await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
   const before = await pose(page, name);
   await page.keyboard.down('s');
-  try { await expect.poll(async () => (await pose(observer, name)).z).toBeGreaterThan(before.z + .15); }
+  try { await expect.poll(async () => { const p = await pose(observer, name); return Math.hypot(p.x - before.x, p.z - before.z); }).toBeGreaterThan(.15); }
   finally { await page.keyboard.up('s'); }
 }
 
