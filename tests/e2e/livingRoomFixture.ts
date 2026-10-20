@@ -11,7 +11,7 @@ export function livingSend(a: LivingActor, command: Command) {
   return new Promise<Ack>((resolve, reject) => a.socket.timeout(5000).emit('command', { id: crypto.randomUUID(), command, phaseId: a.room?.game?.phaseId, socialGeneration: a.room?.social.generation }, (error: Error | null, ack: Ack) => error ? reject(error) : resolve(ack)));
 }
 export async function livingRoom(page: Page, playwright: { request: { newContext: (options: { baseURL: string }) => Promise<APIRequestContext> } }, baseURL: string, count: number) {
-  await page.addInitScript(appearance => localStorage.setItem('rene-profile', JSON.stringify({ name: 'Camille', appearance })), { ...AVATAR_SPECIMENS[0], personality: 'proud' });
+  await page.addInitScript(appearance => { if (!localStorage.getItem('rene-profile')) localStorage.setItem('rene-profile', JSON.stringify({ name: 'Camille', appearance })); }, { ...AVATAR_SPECIMENS[0], personality: 'proud' });
   await page.goto('/'); await page.getByLabel('Pseudonyme').fill('Camille'); await page.getByRole('button', { name: /Créer un salon/ }).click(); await expect(page.locator('.room-code')).toBeVisible();
   // Private cards and the public results pair stay hidden in all captured demo media.
   await page.addStyleTag({ content: '.secret-card, .word-results { visibility: hidden !important; }' });
@@ -25,6 +25,20 @@ export async function livingRoom(page: Page, playwright: { request: { newContext
     expect((await livingSend(a, { type: 'room.join', code, name: ['Lou', 'Sam', 'Alex'][i - 1] ?? 'René ' + (i + 1), appearance: { ...AVATAR_SPECIMENS[i], personality: personalities[i % personalities.length] } })).ok).toBe(true);
   }
   await expect(page.locator('.participants li')).toHaveCount(count);
-  await expect.poll(async () => (await avatarScene(page))?.names.length).toBe(count);
+  await expect.poll(async () => { const scene = await avatarScene(page); return scene && scene.calls > 0 ? scene.names.length : 0; }).toBe(count);
   return { actors, close: async () => { for (const a of actors) { a.socket.disconnect(); await a.context.dispose(); } } };
+}
+
+export async function livingCamera(page: Page) {
+  return page.evaluate(async () => {
+    const path = '/node_modules/.vite/deps/@react-three_fiber.js'; const { _roots } = await import(path);
+    const root = [..._roots.values()].find(r => r.store.getState().gl.domElement.closest('.hub-canvas')); if (!root) throw new Error('Canvas not mounted');
+    const state = root.store.getState();
+    const storePath = '/src/store.ts'; const store = (await import(storePath)).useGame.getState();
+    const controlPath = '/src/scene/camera/useHubControls.ts'; const blocked = (await import(controlPath)).controlsBlocked(document.activeElement);
+    const local = store.room.players.find((p: { id: string }) => p.id === store.session.playerId);
+    const projected = state.camera.position.clone().set(local.position.x, 1.35, local.position.z).project(state.camera);
+    const gl = state.gl.getContext(); const debug = gl.getExtension('WEBGL_debug_renderer_info'); const renderer = gl.getParameter(debug ? debug.UNMASKED_RENDERER_WEBGL : gl.RENDERER);
+    return { renderer, renderDpr: state.gl.getPixelRatio(), blocked, focus: document.activeElement?.tagName, focusClass: document.activeElement?.className, joystick: document.querySelector('.joystick span')?.getAttribute('style'), perspective: state.camera.isPerspectiveCamera, position: state.camera.position.toArray(), orbitYaw: state.camera.userData.orbitYaw, shot: state.camera.userData.shot, area: state.camera.userData.clearArea, screen: { x: (projected.x + 1) * state.size.width / 2, y: (1 - projected.y) * state.size.height / 2 }, local: local.position, calls: state.gl.info.render.calls, triangles: state.gl.info.render.triangles };
+  });
 }

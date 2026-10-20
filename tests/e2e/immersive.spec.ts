@@ -1,28 +1,16 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { joinFour } from './helpers';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { livingRoom, livingState, livingUI, livingSend } from './livingRoomFixture';
+import { livingCamera as camera, livingRoom, livingState, livingUI, livingSend } from './livingRoomFixture';
 import { walkable } from '@rene/contracts';
 test.use({ viewport: { width: 1586, height: 992 }, video: { mode: 'on', size: { width: 1280, height: 800 } } });
 test.afterEach(async ({ page }, info) => {
   const video = page.video(); await page.close();
   if (video && info.status === 'passed' && !info.title.startsWith('TPS prototype')) {
-    await mkdir('output/playwright', { recursive: true }); await video.saveAs('output/playwright/v1.4-' + (info.title.startsWith('TPS phase') ? 'cinematic' : info.title.startsWith('two fingers') ? 'touch' : 'navigation') + '.webm');
+    await mkdir('output/playwright', { recursive: true }); await video.saveAs('output/playwright/v1.4-' + (info.title.startsWith('TPS phase') ? 'cinematic' : 'navigation') + '.webm');
   }
 });
-async function camera(page: Page) {
-  return page.evaluate(async () => {
-    const path = '/node_modules/.vite/deps/@react-three_fiber.js'; const { _roots } = await import(path);
-    const root = [..._roots.values()].find(r => r.store.getState().gl.domElement.closest('.hub-canvas')); if (!root) throw new Error('Canvas not mounted');
-    const state = root.store.getState();
-    const storePath = '/src/store.ts'; const store = (await import(storePath)).useGame.getState();
-    const controlPath = '/src/scene/camera/useHubControls.ts'; const blocked = (await import(controlPath)).controlsBlocked(document.activeElement);
-    const local = store.room.players.find((p: { id: string }) => p.id === store.session.playerId);
-    const projected = state.camera.position.clone().set(local.position.x, 1.35, local.position.z).project(state.camera);
-    const gl = state.gl.getContext(); const debug = gl.getExtension('WEBGL_debug_renderer_info'); const renderer = gl.getParameter(debug ? debug.UNMASKED_RENDERER_WEBGL : gl.RENDERER);
-    return { renderer, renderDpr: state.gl.getPixelRatio(), blocked, focus: document.activeElement?.tagName, focusClass: document.activeElement?.className, joystick: document.querySelector('.joystick span')?.getAttribute('style'), perspective: state.camera.isPerspectiveCamera, position: state.camera.position.toArray(), orbitYaw: state.camera.userData.orbitYaw, shot: state.camera.userData.shot, area: state.camera.userData.clearArea, screen: { x: (projected.x + 1) * state.size.width / 2, y: (1 - projected.y) * state.size.height / 2 }, local: local.position, calls: state.gl.info.render.calls, triangles: state.gl.info.render.triangles };
-  });
-}
+
 test('TPS prototype: free orbit, camera relative movement, HUD framing and same Canvas', async ({ browser, baseURL }) => {
   test.setTimeout(90000);
   const f = await joinFour(browser, baseURL!); const page = f.pages[0]; await page.bringToFront();
@@ -99,44 +87,6 @@ test('Chez René: twelve simultaneous movers, face view, no network camera, resp
   } finally { await f.close(); }
 });
 
-test.describe('immersive mobile input', () => {
-  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-  test('two fingers move and orbit together; drawer cancels movement; personality persists', async ({ page, playwright, baseURL }) => {
-    test.setTimeout(60000);
-    const f = await livingRoom(page, playwright, baseURL!, 4);
-    try {
-      await expect(page.locator('.joystick')).toBeVisible(); const before = await camera(page); const box = (await page.locator('.joystick').boundingBox())!;
-      const cdp = await page.context().newCDPSession(page); const x = box.x + box.width / 2; const y = box.y + box.height / 2;
-      expect(await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest('.joystick'), { x, y })).toBe(true);
-      const area = before.area; const cx = area.left + area.width * .6; const cy = area.top + area.height * .4;
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y, id: 1 }, { x: cx, y: cy, id: 2 }] });
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + 30, y, id: 1 }, { x: cx + 60, y: cy + 10, id: 2 }] });
-      try { await expect.poll(async () => { const p = (await camera(page)).local; return Math.hypot(p.x - before.local.x, p.z - before.local.z); }).toBeGreaterThan(.3); }
-      finally { await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); }
-      const after = await camera(page); expect(after).toMatchObject({ blocked: false }); expect(Math.abs(after.orbitYaw - before.orbitYaw)).toBeGreaterThan(.2); expect(Math.hypot(after.local.x - before.local.x, after.local.z - before.local.z)).toBeGreaterThan(.3);
-      await page.waitForTimeout(150); const stopped = (await camera(page)).local; await page.waitForTimeout(200); expect((await camera(page)).local).toEqual(stopped);
-      await page.screenshot({ path: 'output/playwright/v1.4-touch.png' });
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y, id: 1 }] });
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + 20, y, id: 1 }] });
-      await page.getByRole('navigation', { name: 'Panneaux du salon' }).getByRole('button', { name: /^Suspects/ }).evaluate(button => (button as HTMLButtonElement).click());
-      await expect(page.locator('.joystick')).toHaveCount(0); await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-      await page.waitForTimeout(150); const paused = (await livingState(page)).players.find(p => p.name === 'Camille')!.position;
-      await page.waitForTimeout(200); expect((await livingState(page)).players.find(p => p.name === 'Camille')!.position).toEqual(paused);
-      await page.getByRole('button', { name: /Changer de tête/ }).click();
-      await page.getByLabel('L’allure', { exact: true }).selectOption('nervous'); await page.screenshot({ path: 'output/playwright/v1.4-personality-mobile.png' }); await page.getByRole('button', { name: /Voilà ma nouvelle tête/ }).click();
-      await expect.poll(() => f.actors[0].room?.players.find(p => p.name === 'Camille')?.appearance.personality).toBe('nervous');
-      await page.getByRole('navigation', { name: 'Panneaux du salon' }).getByRole('button', { name: /^Suspects/ }).click();
-      await expect(page.locator('.joystick')).toBeVisible(); const resumed = (await camera(page)).local; const pad = (await page.locator('.joystick').boundingBox())!;
-      const px = pad.x + pad.width / 2; const py = pad.y + pad.height / 2;
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: px, y: py, id: 1 }] });
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: px - 25, y: py, id: 1 }] });
-      try { await expect.poll(async () => { const p = (await camera(page)).local; return Math.hypot(p.x - resumed.x, p.z - resumed.z); }).toBeGreaterThan(.15); }
-      finally { await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); }
-      await page.reload(); await expect(page.locator('.participants li')).toHaveCount(4);
-      expect((await livingState(page)).players.find(p => p.name === 'Camille')!.appearance.personality).toBe('nervous');
-    } finally { await f.close(); }
-  });
-});
 
 test('TPS phase direction: real clues, collective vote, elimination, results and return to lobby', async ({ page, playwright, baseURL }) => {
   test.setTimeout(90000);
