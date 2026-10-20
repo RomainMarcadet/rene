@@ -240,10 +240,12 @@ export class Rooms {
     const z = Math.max(-SALON_BOUNDS.z, Math.min(SALON_BOUNDS.z, player.position.z + direction.z / magnitude * dt * 3.2));
     // Swept movement and social line of sight share the visible furniture footprints.
     if (!walkable({ x, z }) || !clearWorldPath(player.position, { x, z })) return false;
+    const yaw = direction.x || direction.z ? Math.atan2(direction.x, direction.z) : player.position.yaw;
+    if (x === player.position.x && z === player.position.z && yaw === player.position.yaw) return false;
     if ((direction.x || direction.z) && player.social.animation && !ANIMATIONS[player.social.animation.kind].moving) {
       cancelVoluntary(room, player); room.revision++;
     }
-    player.position = { x, z, yaw: direction.x || direction.z ? Math.atan2(direction.x, direction.z) : player.position.yaw };
+    player.position = { x, z, yaw };
     return true;
   }
 

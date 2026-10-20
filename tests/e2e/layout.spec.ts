@@ -64,10 +64,18 @@ test('twelve real participants, bounded HUD at five sizes, persistent draft and 
       const gameplay = await inViewport(page, '.gameplay-zone');
       const actions = await inViewport(page, '.lobby-actions');
       expect(actions.y + actions.height).toBeLessThanOrEqual(gameplay.y + gameplay.height);
+      const themeSummary = page.getByRole('region', { name: 'Thèmes des mots' });
+      const chooseThemes = page.getByRole('button', { name: 'Choisir les thèmes', exact: true });
+      await expect(themeSummary).toBeInViewport({ ratio: 1 });
+      await expect(chooseThemes).toBeInViewport({ ratio: 1 });
+      const themes = await inViewport(page, '.theme-summary');
+      expect(themes.y).toBeGreaterThanOrEqual(gameplay.y);
+      expect(themes.y + themes.height).toBeLessThanOrEqual(actions.y);
       const voice = await inViewport(page, '.voice-panel');
       expect(gameplay.y + gameplay.height).toBeLessThanOrEqual(voice.y + 1);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-      expect(await page.evaluate(() => document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.tagName)).toBe('CANVAS');
+      // Avatar names are now clickable scene controls, so a name may cover this point.
+      expect(await page.evaluate(() => Boolean(document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.closest('.scene-panel')))).toBe(true);
       await page.screenshot({ path: `output/playwright/v1.3-${width}x${height}.png` });
       if (layout !== 'desktop') {
         await showPanel(page, 'Suspects'); await inViewport(page, '.suspects-zone');

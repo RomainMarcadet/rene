@@ -178,6 +178,15 @@ describe('authoritative room lifecycle', () => {
     rooms.disconnected(room, 'p0', initialTime + 1000);
     expect(rooms.move(room, 'p0', { x: 0, z: 1 }, initialTime + 1100)).toBe(false);
   });
+  it('does not broadcast stationary inputs or repeated pushes against the same boundary', async () => {
+    const { rooms, room } = await fixture();
+    const player = room.players.get('p0')!;
+    expect(rooms.move(room, 'p0', { x: 0, z: 0 }, initialTime + 100)).toBe(false);
+    player.position = { x: 7, z: 4, yaw: Math.PI / 2 };
+    expect(rooms.move(room, 'p0', { x: 1, z: 0 }, initialTime + 200)).toBe(false);
+    expect(rooms.move(room, 'p0', { x: -1, z: 0 }, initialTime + 300)).toBe(true);
+    expect(player.position.x).toBeLessThan(7);
+  });
   it('seats only living participants authoritatively and retains positions when voting ends', async () => {
     const { rooms, room } = await fixture(); await start(rooms, room);
     rooms.join(room, guest('late'), initialTime + 20);

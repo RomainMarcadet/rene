@@ -127,7 +127,12 @@ test('four clients react, unanimously start voting and reveal White before a tol
       await expect(card.locator('.elimination-tag')).toHaveCSS('background-color', 'rgb(243, 69, 49)');
       const mark = (await state(page)).room.game.playerMarks[vote.players[white].id];
       await expect(card.locator(`.player-identity[data-player-mark="${mark}"]`)).toHaveCount(1);
-      expect(await card.evaluate(node => getComputedStyle(node).borderLeftColor)).toBe(await card.locator('.player-token').evaluate(node => getComputedStyle(node).backgroundColor));
+      expect(await card.evaluate(node => {
+        const style = getComputedStyle(node); const colour = document.createElement('span');
+        colour.style.color = style.getPropertyValue('--player-color');
+        return style.borderLeftColor === colour.style.color;
+      })).toBe(true);
+      await expect(card.locator('.player-token')).toHaveCount(0);
       await expect(page.locator('.participants li:not(.eliminated) .revealed-role')).toHaveCount(0);
     }));
     await expect(up(pages[white])).toBeDisabled();

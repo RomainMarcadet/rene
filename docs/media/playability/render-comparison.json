@@ -1,0 +1,70 @@
+{
+  "date": "2026-10-20",
+  "baseline": {
+    "source": "../v1.5/metrics.json",
+    "mainCommit": "d9c4621bd2f9a7cb37633891bb6cebae1137b0c0",
+    "rerunInThisEnvironment": false
+  },
+  "current": {
+    "source": "render-12-raw.json",
+    "players": 12,
+    "sameAvatarSpecimens": true,
+    "idle": {
+      "calls": 355,
+      "meshes": 403,
+      "triangles": 35664,
+      "geometries": 62,
+      "materials": 66
+    },
+    "animated": {
+      "calls": 355,
+      "meshes": 403,
+      "triangles": 35664,
+      "geometries": 62,
+      "materials": 66
+    }
+  },
+  "comparison": {
+    "calls": {
+      "before": 427,
+      "after": 355,
+      "reduction": 72,
+      "reductionPercent": 16.86
+    },
+    "meshes": {
+      "before": 475,
+      "after": 403,
+      "reduction": 72,
+      "reductionPercent": 15.16
+    },
+    "triangles": {
+      "before": 36912,
+      "after": 35664,
+      "reduction": 1248,
+      "reductionPercent": 3.38
+    },
+    "geometries": {
+      "before": 62,
+      "after": 62,
+      "reduction": 0,
+      "reductionPercent": 0.0
+    },
+    "materials": {
+      "before": 66,
+      "after": 66,
+      "reduction": 0,
+      "reductionPercent": 0.0
+    }
+  },
+  "runtime": {
+    "playwright": "1.64.0",
+    "chromiumExecutableVersion": "141.0.7390.37",
+    "livekit": "1.13.9",
+    "devicePixelRatio": 1
+  },
+  "notes": [
+    "These are scene complexity counts, not FPS measurements.",
+    "The raw userAgent comes from the Playwright device descriptor and is not the executed Chromium version.",
+    "Native loopback LiveKit was used only for local voice validation."
+  ]
+}

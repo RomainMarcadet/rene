@@ -1,0 +1,44 @@
+/* Small, non-modal gesture palette. The salon remains clickable and movable. */
+.room-page .scene-toolbar.social-controls { gap: 8px; padding: 6px 10px; }
+.room-page .scene-toolbar.social-controls .social-favorites { gap: 4px; }
+.room-page .scene-toolbar.social-controls .social-favorites button { width: 40px; height: 42px; border-radius: 9px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 2px; }
+.room-page .scene-toolbar.social-controls .social-favorites button>span { font-size: 18px; line-height: 1.1; }
+.room-page .social-controls kbd { font: 800 9px Arial, sans-serif; opacity: .7; line-height: 1; }
+.room-page .social-picker { position: absolute; top: calc(var(--nav-height) + 80px); left: 50%; transform: translateX(-50%); width: min(500px, calc(100% - 24px)); max-height: calc(100% - var(--nav-height) - 115px); overflow: auto; overscroll-behavior: contain; padding: 16px; border: var(--line); border-radius: 12px; box-shadow: 5px 5px 0 var(--ink); background: var(--cream); z-index: 30; }
+.room-page .social-picker-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.room-page .social-picker h2 { margin: 0 0 6px; font-size: 25px; overflow-wrap: anywhere; }
+.room-page .social-picker-heading p { margin: 0; font-size: 11px; line-height: 1.4; }
+.room-page .social-picker .icon-button { padding: 4px; min-width: 36px; min-height: 36px; border: 1.5px solid var(--ink); border-radius: 7px; }
+.room-page .social-picker .social-tabs { gap: 5px; margin: 14px 0 10px; }
+.room-page .social-picker .social-tabs button { flex: 1 1 auto; min-height: 38px; font-size: 11px; padding: 7px; }
+.room-page .social-picker .social-catalog { gap: 7px; }
+.room-page .social-picker .social-catalog button { min-height: 44px; text-align: left; background: #fffdf8; }
+.room-page .social-picker .social-catalog button:not(:disabled):hover { background: var(--yellow); }
+.room-page .social-picker .social-preference { font-size: 12px; margin: 14px 0 8px; }
+.room-page .social-picker .hint { margin: 10px 0 0; font-size: 10px; }
+.room-page .social-picker .social-stop { min-height: 36px; padding: 6px 10px; border: 1.5px solid var(--ink); border-radius: 6px; font-size: 11px; font-weight: 800; margin-top: 10px; }
+.room-page .social-targets { padding: 10px; background: #e8e3d8; border-radius: 8px; margin-bottom: 10px; }
+.room-page .social-targets p { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0; font-size: 12px; font-weight: 800; overflow-wrap: anywhere; }
+.room-page .social-targets>div { display: flex; flex-wrap: wrap; gap: 5px; }
+.room-page .social-targets>p+div:not(:empty) { margin-top: 7px; }
+.room-page .social-targets>div>button { padding: 8px 10px; min-height: 36px; border: 1.5px solid var(--ink); border-radius: 7px; background: var(--cream); font-size: 12px; font-weight: 800; }
+.room-page .social-targets>div>button[aria-pressed=true] { background: var(--yellow); }
+.room-page .social-targets>div>.social-target-auto { border-color: transparent; background: transparent; font-size: 10px; text-decoration: underline; }
+.room-page .avatar-name.avatar-label:has(.player-identity) { display: block; position: relative; width: max-content; max-width: 140px; padding: 2px; border-radius: 5px; overflow: visible; white-space: nowrap; text-align: center; cursor: inherit; }
+.room-page .avatar-name.avatar-label .player-identity { display: flex; justify-content: center; padding: 2px 3px; border-radius: 3px; }
+.room-page .avatar-name.avatar-label .player-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 900; line-height: 1.2; }
+.room-page .avatar-name.avatar-label .avatar-clue { display: none; position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); width: 180px; padding: 7px 9px; border: 1.5px solid var(--ink); border-radius: 5px; background: var(--cream); color: var(--ink); box-shadow: 1px 2px 0 var(--ink); white-space: normal; overflow-wrap: anywhere; font-size: 11px; font-weight: 600; line-height: 1.3; pointer-events: none; }
+.room-page .avatar-name.avatar-label:is(:hover, :focus) .avatar-clue { display: block; }
+.room-page .avatar-label-anchor:has(.avatar-label:is(:hover, :focus)) { z-index: 9 !important; }
+.room-page .avatar-name.avatar-label[aria-label^="Interagir"], .room-page .avatar-name.avatar-label[aria-label^="Voter"] { cursor: pointer; }
+.room-page .avatar-name.avatar-label[aria-label^="Interagir"]:hover { outline: 2px solid var(--ink); outline-offset: 2px; }
+.room-page .avatar-name.avatar-label.talking { border-color: #31791e; }
+.room-page.layout-mobile .scene-toolbar.social-controls .social-favorites button { width: 44px; height: 44px; }
+.room-page.layout-mobile .scene-toolbar.social-controls .social-favorites button[aria-label="Emote Danse"], .room-page.layout-mobile .scene-toolbar.social-controls .social-favorites button[aria-label="Emote Soupçon"] { display: none; }
+.room-page.layout-mobile .social-picker { top: calc(var(--nav-height) + 8px); max-height: min(52%, 430px); padding: 12px; }
+.room-page.layout-mobile .social-picker h2 { font-size: 23px; }
+.room-page.layout-mobile .avatar-name.avatar-label { max-width: 110px; }
+.room-page.layout-mobile.clues-open .avatar-label-anchor { display: none; }
+@media (max-height: 599px) and (min-width: 600px) {
+  .room-page.layout-mobile .social-picker { left: auto; right: 12px; transform: none; width: min(440px, 58%); max-height: calc(100% - var(--nav-height) - 65px); }
+}

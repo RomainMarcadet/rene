@@ -12,10 +12,10 @@ function segment(mesh: Mesh | null, from: Vector3, to: Vector3, direction: Vecto
   direction.subVectors(to, from); const size = direction.length();
   mesh.quaternion.setFromUnitVectors(UP, direction.normalize()); mesh.scale.y = size / .65;
 }
-/** Two short, elastic cartoon segments. All scratch vectors are retained per arm. */
+/** One elastic stroke and a mitten: retain the naive silhouette without an elbow rig. */
 export function ArticulatedArm({ side, pose, skin, body }: { side: number; pose: RefObject<Pose>; skin: string; body: string }) {
-  const finger = useRef<Mesh>(null); const upper = useRef<Mesh>(null); const forearm = useRef<Mesh>(null); const hand = useRef<Group>(null);
-  const v = useMemo(() => ({ shoulder: new Vector3(side * .38, 1, 0), target: new Vector3(side * .48, .35, 0), wanted: new Vector3(), elbow: new Vector3(), direction: new Vector3(), pole: new Vector3(), rotation: new Euler() }), [side]);
+  const finger = useRef<Mesh>(null); const arm = useRef<Mesh>(null); const hand = useRef<Group>(null);
+  const v = useMemo(() => ({ shoulder: new Vector3(side * .38, 1, 0), target: new Vector3(side * .48, .35, 0), wanted: new Vector3(), direction: new Vector3(), rotation: new Euler() }), [side]);
   useFrame((_state, dt) => {
     const p = pose.current; const right = side > 0;
     if (finger.current) finger.current.visible = p.state === 'point';
@@ -26,22 +26,14 @@ export function ArticulatedArm({ side, pose, skin, body }: { side: number; pose:
       if (right) v.wanted.y += p.rightLift;
     }
     v.target.lerp(v.wanted, 1 - Math.exp(-18 * dt));
-    const distance = Math.max(.01, v.direction.subVectors(v.target, v.shoulder).length());
-    v.direction.divideScalar(distance);
-    v.pole.set(side, 0, -.15).addScaledVector(v.direction, -v.pole.dot(v.direction)).normalize();
-    const length = Math.max(.38, distance * .56);
-    v.elbow.copy(v.shoulder).lerp(v.target, .5).addScaledVector(v.pole, Math.sqrt(Math.max(0, length * length - distance * distance / 4)));
-    segment(upper.current, v.shoulder, v.elbow, v.direction); segment(forearm.current, v.elbow, v.target, v.direction);
+    segment(arm.current, v.shoulder, v.target, v.direction);
     if (hand.current) { hand.current.position.copy(v.target); hand.current.rotation.x = MathUtils.damp(hand.current.rotation.x, right ? p.rightPalm : p.leftPalm, 18, dt); }
   });
   return <>
-    <mesh ref={upper} geometry={avatarGeometry.arm} material={avatarMaterial(body)} dispose={null} />
-    <mesh ref={forearm} geometry={avatarGeometry.arm} material={avatarMaterial(body)} dispose={null} />
-    <group ref={hand}>
+    <mesh name="avatar-arm" ref={arm} geometry={avatarGeometry.arm} material={avatarMaterial(body)} dispose={null} />
+    <group name="avatar-hand" ref={hand}>
       {side > 0 && <mesh ref={finger} visible={false} position={[0, .19, 0]} scale={[.08, .25, .08]} geometry={avatarGeometry.box} material={avatarMaterial(skin)} dispose={null} />}
-      <mesh scale={[.14, .17, .08]} geometry={avatarGeometry.sphere} material={avatarMaterial(skin)} dispose={null} />
-      <mesh position={[side * .12, -.015, 0]} scale={[.14, .18, .13]} geometry={avatarGeometry.box} material={avatarMaterial(skin)} dispose={null} />
-      <mesh position={[0, .015, .076]} scale={[.11, .13, .025]} geometry={avatarGeometry.box} material={avatarMaterial('#191719')} dispose={null} />
+      <mesh scale={[.18, .19, .08]} geometry={avatarGeometry.sphere} material={avatarMaterial(skin)} dispose={null} />
     </group>
   </>;
 }

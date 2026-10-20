@@ -13,7 +13,8 @@
   "scripts": {
     "predev": "npm run db:generate",
     "dev": "concurrently -k -n server,web \"npm run dev -w @rene/server\" \"npm run dev -w @rene/web\"",
-    "build": "npm run build -w @rene/web && npm run build -w @rene/server",
+    "build": "npm run build -w @rene/web && npm run audit:word-boundary && npm run build -w @rene/server",
+    "audit:word-boundary": "tsx scripts/check-word-boundary.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",

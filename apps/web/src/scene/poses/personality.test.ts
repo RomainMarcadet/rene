@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { AppearanceSchema, DEFAULT_APPEARANCE, PERSONALITIES, type Personality } from '@rene/contracts';
 import { avatarPose } from '../animation';
-import { characterSeed, personalityPose } from './personality';
+import { applyPoses, getPose, resetPoses } from '../../poses';
+import { characterSeed, personalityPose, speakerGaze } from './personality';
 function sample(personality: Personality, reduced = false, state?: string) {
   const p = avatarPose({ time: 1, now: 1000, moving: !state, reduced }); if (state) p.state = state;
   const face = { blink: 1, talk: 0, look: 0 }; personalityPose(p, 1, personality, 2, reduced, true, .8, face); return { p, face };
@@ -42,4 +43,18 @@ describe('public cosmetic personality layer', () => {
     personalityPose(p, 1, 'nervous', 2, false, true, .45, face);
     expect(p.headY).toBe(turn); expect(face.talk).toBeGreaterThan(0);
   });
+});
+
+it('tracks a moving speaker through the pose cache without changing room player positions', () => {
+  const player = (id: string, x: number, z: number) => ({ id, name: id, appearance: DEFAULT_APPEARANCE, position: { x, z, yaw: 0 }, alive: true, waiting: false, connected: true, ready: false, score: 0 });
+  const listener = player('listener', 0, 4); const speaker = player('speaker', 0, 5); const players = [listener, speaker];
+  resetPoses(players);
+  try {
+    expect(speakerGaze(listener, players, ['speaker'], getPose)).toBe(0);
+    applyPoses({ speaker: { x: 1, z: 4, yaw: 0 } });
+    expect(speakerGaze(listener, players, ['speaker'], getPose)).toBeCloseTo(Math.PI / 2);
+    expect(speakerGaze(listener, players, ['speaker'])).toBe(0);
+    expect(speakerGaze(listener, players, [], getPose)).toBe(0);
+    expect(speaker.position).toEqual({ x: 0, z: 5, yaw: 0 });
+  } finally { resetPoses(); }
 });

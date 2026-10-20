@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { reuseAppearances } from './snapshots';
+import { applyPoses, resetPoses } from './poses';
 import { commandId } from './commandId';
 import { io, type Socket } from 'socket.io-client';
 import { AppearanceSchema, DEFAULT_APPEARANCE, type AvatarAppearance, type ClientEvents, type Command, type PrivatePlayerState, type RoomSnapshot, type ServerEvents } from '@rene/contracts';
@@ -45,9 +46,11 @@ async function reconnect(manual: boolean) {
     const previous = useGame.getState();
     const session = await fetchSession();
     if (replaced) return;
-    const lostRoom = Boolean(previous.room && (previous.session?.playerId !== session.playerId || !session.roomCode));
+    const changedRoom = Boolean(previous.room && session.roomCode && previous.room.code !== session.roomCode);
+    const lostRoom = Boolean(previous.room && (previous.session?.playerId !== session.playerId || !session.roomCode || changedRoom));
+    if (lostRoom) resetPoses();
     useGame.setState({ session, loading: false, connectionMessage: 'Reconnexion au salon…', ...(lostRoom ? { room: null, secret: null } : {}) });
-    if (lostRoom) notify('Votre ancienne session a fermé. Vous pouvez créer ou rejoindre un salon.');
+    if (lostRoom) notify(changedRoom ? 'Votre session est maintenant dans un autre salon. Reconnexion en cours…' : 'Votre ancienne session a fermé. Vous pouvez créer ou rejoindre un salon.');
     socket.connect();
   } catch { failed = true; useGame.setState({ connectionMessage: 'Le salon est momentanément injoignable.' }); }
   finally { retryInProgress = false; }
@@ -89,11 +92,14 @@ export function initialize() {
       });
       socket.on('snapshot', room => {
         const previous = useGame.getState().room;
+        resetPoses(room.players);
         useGame.setState({ room: { ...room, players: reuseAppearances(room.players, previous?.players) }, offset: room.serverNow - Date.now(), ...(previous?.game?.id !== room.game?.id ? { secret: null } : {}) });
-        const url = new URL(location.href); url.searchParams.set('room', room.code); history.replaceState(null, '', url);
+        if (new URL(location.href).searchParams.get('room') !== room.code) {
+          const url = new URL(location.href); url.searchParams.set('room', room.code); history.replaceState(null, '', url);
+        }
       });
       socket.on('private', secret => useGame.setState({ secret }));
-      socket.on('poses', positions => useGame.setState(state => ({ room: state.room ? { ...state.room, players: state.room.players.map(player => ({ ...player, position: positions[player.id] ?? player.position })) } : null })));
+      socket.on('poses', applyPoses);
       socket.on('notice', notify);
       socket.on('replaced', () => { replaced = true; cancelRetry(); socket?.disconnect(); useGame.setState({ connectionMessage: 'Votre place est ouverte dans un autre onglet.' }); notify('Votre place est ouverte dans un autre onglet. Rechargez ici pour la reprendre.'); });
       socket.connect();
@@ -110,6 +116,7 @@ export function send(command: Command, quiet = false): Promise<boolean> {
       if (command.type === 'room.leave' || (command.type === 'room.resume' && !result.code && Boolean(current.room || current.session?.roomCode))) {
         if (command.type === 'room.resume') notify('Ce salon a fermé. Créez-en un nouveau pour retrouver vos amis.');
         useGame.setState({ room: null, secret: null });
+        resetPoses();
         if (current.session) current.session.roomCode = null;
         const url = new URL(location.href); url.searchParams.delete('room'); history.replaceState(null, '', url);
       }

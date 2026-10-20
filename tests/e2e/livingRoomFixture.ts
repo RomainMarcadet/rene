@@ -4,7 +4,7 @@ import { type RoomSnapshot, type Command, type Ack } from '@rene/contracts';
 import { AVATAR_SPECIMENS } from '../../apps/web/src/avatar/specimens';
 import { avatarScene } from './avatarScene';
 const personalities = ['nervous', 'relaxed', 'proud', 'impassive'] as const;
-export async function livingState(page: Page): Promise<RoomSnapshot> { return page.evaluate(async () => { const path = '/src/store.ts'; return (await import(path)).useGame.getState().room; }); }
+export async function livingState(page: Page): Promise<RoomSnapshot> { return page.evaluate(async () => { const path = '/src/store.ts'; const posePath = '/src/poses.ts'; const room = (await import(path)).useGame.getState().room; const { getPose } = await import(posePath); return { ...room, players: room.players.map((p: RoomSnapshot['players'][number]) => ({ ...p, position: getPose(p.id, p.position) })) }; }); }
 export async function livingUI(page: Page, command: Command) { return page.evaluate(async command => { const path = '/src/store.ts'; return (await import(path)).send(command); }, command); }
 export type LivingActor = { id: string; socket: Socket; context: APIRequestContext; room?: RoomSnapshot };
 export function livingSend(a: LivingActor, command: Command) {
@@ -37,8 +37,9 @@ export async function livingCamera(page: Page) {
     const storePath = '/src/store.ts'; const store = (await import(storePath)).useGame.getState();
     const controlPath = '/src/scene/camera/useHubControls.ts'; const blocked = (await import(controlPath)).controlsBlocked(document.activeElement);
     const local = store.room.players.find((p: { id: string }) => p.id === store.session.playerId);
-    const projected = state.camera.position.clone().set(local.position.x, 1.35, local.position.z).project(state.camera);
+    const posePath = '/src/poses.ts'; const position = (await import(posePath)).getPose(local.id, local.position);
+    const projected = state.camera.position.clone().set(position.x, 1.35, position.z).project(state.camera);
     const gl = state.gl.getContext(); const debug = gl.getExtension('WEBGL_debug_renderer_info'); const renderer = gl.getParameter(debug ? debug.UNMASKED_RENDERER_WEBGL : gl.RENDERER);
-    return { renderer, renderDpr: state.gl.getPixelRatio(), blocked, focus: document.activeElement?.tagName, focusClass: document.activeElement?.className, joystick: document.querySelector('.joystick span')?.getAttribute('style'), perspective: state.camera.isPerspectiveCamera, position: state.camera.position.toArray(), orbitYaw: state.camera.userData.orbitYaw, shot: state.camera.userData.shot, area: state.camera.userData.clearArea, screen: { x: (projected.x + 1) * state.size.width / 2, y: (1 - projected.y) * state.size.height / 2 }, local: local.position, calls: state.gl.info.render.calls, triangles: state.gl.info.render.triangles };
+    return { renderer, renderDpr: state.gl.getPixelRatio(), blocked, focus: document.activeElement?.tagName, focusClass: document.activeElement?.className, joystick: document.querySelector('.joystick span')?.getAttribute('style'), perspective: state.camera.isPerspectiveCamera, position: state.camera.position.toArray(), orbitYaw: state.camera.userData.orbitYaw, shot: state.camera.userData.shot, area: state.camera.userData.clearArea, screen: { x: (projected.x + 1) * state.size.width / 2, y: (1 - projected.y) * state.size.height / 2 }, local: position, calls: state.gl.info.render.calls, triangles: state.gl.info.render.triangles };
   });
 }

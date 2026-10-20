@@ -30,7 +30,7 @@ export function auditWordLibrary(pairs: readonly WordPair[]): WordIssue[] {
     const alias = references.get(canonical);
     if (alias && !previous) issue('alias-duplicate', alias); else references.set(canonical, id);
     if (referenceKey(pair.a) === referenceKey(pair.b) && a !== b) issue('identical-reference');
-    if (id.startsWith('v14-')) {
+    if (id.startsWith('v14-') || id.startsWith('v16-')) {
       if (!pair.clueAxes || pair.clueAxes.length !== 2 || pair.clueAxes.some(axis => typeof axis !== 'string' || axis.trim().length < 2) || pair.clueAxes[0] === pair.clueAxes[1]) issue('editorial-evidence');
       if (Math.min(a.length, b.length) >= 4 && (a.includes(b) || b.includes(a))) issue('contained-answer');
     }

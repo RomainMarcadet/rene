@@ -4,16 +4,20 @@ export * from './appearance.js';
 export * from './playerMarks.js';
 export * from './social.js';
 export * from './world.js';
+export * from './wordCategories.js';
+import { WORD_CATEGORY_IDS, WordCategorySchema } from './wordCategories.js';
 import { AnimationIdSchema, AttackKindSchema, type SocialSnapshot } from './social.js';
 export const SettingsSchema = z.object({
   automaticRoles: z.boolean(), undercoverCount: z.number().int().min(0).max(10), whiteCount: z.number().int().min(0).max(10),
   descriptionSeconds: z.number().int().min(10).max(180), discussionSeconds: z.number().int().min(15).max(600),
   voteSeconds: z.number().int().min(10).max(120), guessSeconds: z.number().int().min(10).max(120),
   roundsPerSession: z.number().int().min(1).max(20), hostCanSkipDiscussion: z.boolean(), deadCanSpeak: z.boolean(),
-  category: z.enum(['all', 'quotidien', 'nature', 'cuisine', 'culture', 'voyage', 'cinema', 'jeux-video', 'internet', 'musique', 'sport', 'politique', 'television', 'technologie', 'histoire', 'sciences']), difficulty: z.enum(['all', 'easy', 'medium', 'hard']),
+  category: z.enum(['all', ...WORD_CATEGORY_IDS]), difficulty: z.enum(['all', 'easy', 'medium', 'hard']),
+  categories: z.array(WordCategorySchema).max(WORD_CATEGORY_IDS.length).refine(values => new Set(values).size === values.length, 'Chaque thème doit être unique.').default([]),
+  adultContent: z.boolean().default(false),
 }).strict();
 export type RoomSettings = z.infer<typeof SettingsSchema>;
-export const DEFAULT_SETTINGS: RoomSettings = { automaticRoles: true, undercoverCount: 1, whiteCount: 1, descriptionSeconds: 45, discussionSeconds: 120, voteSeconds: 30, guessSeconds: 30, roundsPerSession: 5, hostCanSkipDiscussion: true, deadCanSpeak: false, category: 'all', difficulty: 'all' };
+export const DEFAULT_SETTINGS: RoomSettings = { automaticRoles: true, undercoverCount: 1, whiteCount: 1, descriptionSeconds: 45, discussionSeconds: 120, voteSeconds: 30, guessSeconds: 30, roundsPerSession: 5, hostCanSkipDiscussion: true, deadCanSpeak: false, category: 'all', difficulty: 'all', categories: [], adultContent: false };
 export type Role = 'civilian' | 'undercover' | 'white';
 export type Phase = 'reveal' | 'description' | 'discussion' | 'vote' | 'tiebreak' | 'elimination' | 'whiteGuess' | 'results';
 export type Winner = 'civilians' | 'infiltrators' | 'white';

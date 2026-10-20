@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { canMoveInPhase, type RoomSnapshot } from '@rene/contracts';
+import { canMoveInPhase, socialParticipantAllowed, type RoomSnapshot } from '@rene/contracts';
 import { send, useGame } from '../store';
+import { getPose } from '../poses';
+import { selectSocialTarget, useSocialSelection } from '../socialSelection';
 import { speakerGaze } from './poses/personality';
 import { Avatar } from './Avatar';
 import { World } from './world/World';
@@ -16,17 +18,20 @@ export { useReducedMotion } from './useReducedMotion';
 export default function Hub({ room, playerId, speaking, clearArea, compact, controlsVisible, paused = false }: { room: RoomSnapshot; playerId: string; speaking: string[]; clearArea: ClearArea; compact: boolean; controlsVisible: boolean; paused?: boolean }) {
   const reduced = useReducedMotion(); const offset = useGame(s => s.offset); const voteTarget = useGame(s => s.secret?.voteTarget);
   const orbit = useRef<OrbitState>({ yaw: Math.PI, viewYaw: Math.PI, pitch: TPS.pitch, interrupted: '', overview: false });
+  const socialTarget = useSocialSelection(s => s.targetId);
+  const [visible, setVisible] = useState(() => !document.hidden);
+  useEffect(() => { const update = () => setVisible(!document.hidden); document.addEventListener('visibilitychange', update); return () => document.removeEventListener('visibilitychange', update); }, []);
   const [quality, setQuality] = useState(1);
   const [overview, setOverview] = useState(false); const drag = useRef<{ id: number; x: number; y: number } | null>(null);
   const vote = !canMoveInPhase(room.game?.phase); const me = room.players.find(p => p.id === playerId);
-  const touch = useHubControls(room, orbit, controlsVisible, () => recenter());
+  const touch = useHubControls(room, orbit, controlsVisible && visible && !paused, () => recenter());
   useEffect(() => { if (!controlsVisible || vote) drag.current = null; }, [controlsVisible, vote]);
   useEffect(() => {
     const reset = () => { drag.current = null; }; const focus = () => { if (controlsBlocked(document.activeElement)) reset(); };
     window.addEventListener('blur', reset); window.addEventListener('resize', reset); window.visualViewport?.addEventListener('resize', reset); document.addEventListener('visibilitychange', reset); document.addEventListener('focusin', focus);
     return () => { window.removeEventListener('blur', reset); window.removeEventListener('resize', reset); window.visualViewport?.removeEventListener('resize', reset); document.removeEventListener('visibilitychange', reset); document.removeEventListener('focusin', focus); };
   }, []);
-  const recenter = () => { orbit.current.yaw = (me?.position.yaw ?? 0) + Math.PI; orbit.current.pitch = TPS.pitch; orbit.current.interrupted = shotKey(room.game); orbit.current.overview = false; setOverview(false); };
+  const recenter = () => { orbit.current.yaw = (me ? getPose(me.id, me.position).yaw : 0) + Math.PI; orbit.current.pitch = TPS.pitch; orbit.current.interrupted = shotKey(room.game); orbit.current.overview = false; setOverview(false); };
   return <><div className="hub-canvas" onPointerDown={e => {
     if (vote || !controlsVisible || document.querySelector('dialog[open]') || e.button !== 0 || drag.current || !(e.target instanceof HTMLCanvasElement)) return;
     e.target.focus({ preventScroll: true });
@@ -37,12 +42,16 @@ export default function Hub({ room, playerId, speaking, clearArea, compact, cont
     orbit.current.pitch = Math.max(TPS.minPitch, Math.min(TPS.maxPitch, orbit.current.pitch + (e.clientY - d.y) * .004));
     orbit.current.interrupted = shotKey(room.game); d.x = e.clientX; d.y = e.clientY;
   }} onPointerUp={e => { if (drag.current?.id === e.pointerId) drag.current = null; }} onPointerCancel={e => { if (drag.current?.id === e.pointerId) drag.current = null; }} onLostPointerCapture={e => { if (drag.current?.id === e.pointerId) drag.current = null; }}>
-    <Canvas frameloop={paused ? 'demand' : 'always'} onCreated={({ gl }) => { gl.domElement.tabIndex = 0; gl.domElement.setAttribute('aria-label', 'Scène : glisser pour regarder, ZQSD ou WASD pour marcher, R pour recentrer'); }} camera={{ position: [4, 4, -6], fov: TPS.fov, near: .08, far: 180 }} dpr={Math.max(1, Math.min(1.5, window.devicePixelRatio || 1)) * quality} gl={{ antialias: true, alpha: false, powerPreference: 'low-power' }} fallback={<div className="scene-fallback">La 3D est indisponible. La partie reste accessible dans les panneaux.</div>}>
-      <ResolutionBudget quality={quality} paused={paused} onQuality={setQuality} />
+    <Canvas frameloop={!visible ? 'never' : paused ? 'demand' : 'always'} onCreated={({ gl }) => { gl.domElement.tabIndex = 0; gl.domElement.setAttribute('aria-label', 'Scène : glisser pour regarder, ZQSD ou WASD pour marcher, R pour recentrer'); }} camera={{ position: [4, 4, -6], fov: TPS.fov, near: .08, far: 180 }} dpr={Math.max(1, Math.min(compact ? 1 : 1.25, window.devicePixelRatio || 1)) * quality} gl={{ antialias: true, alpha: false, powerPreference: 'low-power' }} fallback={<div className="scene-fallback">La 3D est indisponible. La partie reste accessible dans les panneaux.</div>}>
+      <ResolutionBudget quality={quality} paused={paused || !visible} onQuality={setQuality} />
       <World /><CameraDirector room={room} playerId={playerId} area={clearArea} orbit={orbit} reduced={reduced} />
       {room.players.map(p => {
         const selectable = vote && !voteTarget && me?.alive && !me.waiting && p.id !== playerId && room.game!.voteCandidates.includes(p.id);
-        return <Avatar key={p.id} identity={p.id} gaze={speakerGaze(p, room.players, speaking)} appearance={p.appearance} name={p.name} mark={room.game?.playerMarks[p.id]} position={[p.position.x, 0, p.position.z]} yaw={p.position.yaw} seated={vote} selected={p.id === playerId || p.id === room.game?.turnPlayerId} speaking={speaking.includes(p.id)} dead={!p.alive && !p.waiting} winner={room.game?.phase === 'results' && room.game.result?.winnerIds.includes(p.id)} emote={p.emote?.kind} emoteUntil={p.emote ? p.emote.until - offset : undefined} onClick={selectable ? () => void send({ type: 'game.vote', targetId: p.id }) : undefined} reducedMotion={reduced} social={room.social.players[p.id]} serverOffset={offset} phase={room.game?.phase} recipient={room.social.interactions.some(i => i.toId === p.id && i.state === 'active')} partner={room.players.find(other => other.id === room.social.players[p.id]?.animation?.targetId)?.position} />;
+        const interactable = !vote && me && socialParticipantAllowed(me, room.game?.phase) && p.id !== playerId && p.connected && !p.waiting;
+        const description = room.game?.descriptions.find(d => d.playerId === p.id && d.round === room.game!.round);
+        const clue = description ? description.timedOut ? 'Tour passé' : description.text : room.game ? p.waiting ? 'Prochaine partie' : 'Indice à venir' : undefined;
+        const partnerId = room.social.players[p.id]?.animation?.targetId;
+        return <Avatar key={p.id} playerId={p.id} identity={p.id} clue={clue} gaze={() => speakerGaze(p, room.players, speaking, getPose)} appearance={p.appearance} name={p.name} mark={room.game?.playerMarks[p.id]} position={[p.position.x, 0, p.position.z]} yaw={p.position.yaw} seated={vote} selected={p.id === playerId || p.id === room.game?.turnPlayerId || !vote && p.id === socialTarget} speaking={speaking.includes(p.id)} dead={!p.alive && !p.waiting} winner={room.game?.phase === 'results' && room.game.result?.winnerIds.includes(p.id)} emote={p.emote?.kind} emoteUntil={p.emote ? p.emote.until - offset : undefined} onClick={selectable ? () => void send({ type: 'game.vote', targetId: p.id }) : interactable ? () => selectSocialTarget(p.id) : undefined} onClickLabel={selectable ? `Voter contre ${p.name}` : interactable ? `Interagir avec ${p.name}` : undefined} reducedMotion={reduced} social={room.social.players[p.id]} serverOffset={offset} phase={room.game?.phase} recipient={room.social.interactions.some(i => i.toId === p.id && i.state === 'active')} partnerId={partnerId} partner={room.players.find(other => other.id === partnerId)?.position} />;
       })}
     </Canvas>
   </div>

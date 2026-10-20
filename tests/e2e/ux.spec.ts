@@ -4,13 +4,14 @@ import { type Ack, type Command, type RoomSnapshot } from '@rene/contracts';
 import { AVATAR_SPECIMENS } from '../../apps/web/src/avatar/specimens';
 import { showPanel, submitDescription } from './helpers';
 
-test.use({ launchOptions: { args: ['--autoplay-policy=no-user-gesture-required'] } });
+test.use({ launchOptions: { executablePath: process.env.RENE_CHROMIUM_EXECUTABLE_PATH, args: ['--autoplay-policy=no-user-gesture-required'] } });
 const viewports = [[1586, 992], [1366, 768], [1024, 768], [768, 1024], [390, 844], [844, 390]] as const;
 
 async function relativeSlots(page: Page) {
   return page.locator('.current-round li').evaluateAll(nodes => nodes.map(node => {
     const box = node.getBoundingClientRect(); const panel = node.closest('.clues-zone')!.getBoundingClientRect();
-    return { x: box.x - panel.x, y: box.y - panel.y };
+    const scroll = node.closest('.history-rounds')!;
+    return { x: box.x - panel.x + scroll.scrollLeft, y: box.y - panel.y + scroll.scrollTop };
   }));
 }
 
@@ -33,7 +34,8 @@ async function expectCardIdentities(page: Page) {
       id: node.getAttribute('data-player-id'), appearance: portrait.querySelector('svg')?.getAttribute('data-appearance'),
       colour: surface.backgroundColor === normalize(surface.getPropertyValue('--player-color')),
       contrast: text.color === normalize(surface.getPropertyValue('--player-foreground')) && name.color === text.color,
-      hierarchy: parseFloat(text.fontSize) > parseFloat(name.fontSize),
+      hierarchy: parseFloat(name.fontSize) > parseFloat(text.fontSize) && node.querySelector('.clue-author')!.getBoundingClientRect().bottom <= node.querySelector('.clue-text')!.getBoundingClientRect().top + 1,
+      numbered: node.querySelector('.player-token') !== null,
       portraitVisible: getComputedStyle(portrait).display !== 'none' && portrait.getBoundingClientRect().width >= 32 && portrait.getBoundingClientRect().height >= 37,
     };
   }));
@@ -42,7 +44,8 @@ async function expectCardIdentities(page: Page) {
     expect(card.appearance).toBe([a.head, a.hair, a.eyes, a.mouth, a.nose, a.accessory].join(':'));
     expect(card.colour, `identity colour for ${card.id}`).toBe(true);
     expect(card.contrast, `foreground contrast for ${card.id}`).toBe(true);
-    expect(card.hierarchy, `clue prominence for ${card.id}`).toBe(true);
+    expect(card.hierarchy, `name above the clue for ${card.id}`).toBe(true);
+    expect(card.numbered, `no assigned number for ${card.id}`).toBe(false);
     expect(card.portraitVisible, `recognizable portrait for ${card.id}`).toBe(true);
   }
 }
@@ -73,7 +76,7 @@ for (const count of [4, 6, 8, 12]) test(`all current clues remain readable with 
       const cookie = (await context.storageState()).cookies.map(c => `${c.name}=${c.value}`).join('; ');
       const client = io(baseURL!, { transports: ['websocket'], autoConnect: false, extraHeaders: { Cookie: cookie, Origin: baseURL! } }); clients.set(id, client);
       await new Promise<void>((resolve, reject) => { client.once('connect', resolve); client.once('connect_error', reject); client.connect(); });
-      expect((await send(client, { type: 'room.join', code, name: `Suspect ${i + 1}`, appearance: AVATAR_SPECIMENS[i] })).ok).toBe(true);
+      expect((await send(client, { type: 'room.join', code, name: i === count - 1 ? 'Alexandrine du Grandpré' : `Suspect ${i + 1}`, appearance: AVATAR_SPECIMENS[i] })).ok).toBe(true);
     }
     await expect(page.locator('.participants li')).toHaveCount(count);
     for (const client of clients.values()) expect((await send(client, { type: 'player.ready', ready: true })).ok).toBe(true);
@@ -106,7 +109,9 @@ for (const count of [4, 6, 8, 12]) test(`all current clues remain readable with 
         await showPanel(page, 'Indices');
         await expect(page.getByLabel('Votre indice', { exact: true })).toBeInViewport({ ratio: 1 });
         await expect(page.getByRole('button', { name: /Valider mon indice/ })).toBeInViewport({ ratio: 1 });
-        await expect(page.locator('.current-round [aria-current="step"]')).toBeInViewport({ ratio: 1 });
+        await page.locator('.current-round [aria-current="step"]').scrollIntoViewIfNeeded();
+        // Native scrolling can round the last card edge by a fraction of a pixel.
+        await expect(page.locator('.current-round [aria-current="step"]')).toBeInViewport({ ratio: 0.99 });
         await page.setViewportSize({ width: 1586, height: 992 });
         await expect(page.locator('.layout-desktop')).toBeVisible();
         await submitDescription(page, text);
@@ -141,6 +146,7 @@ for (const count of [4, 6, 8, 12]) test(`all current clues remain readable with 
     for (const [width, height] of viewports) {
       await page.setViewportSize({ width, height });
       await showPanel(page, 'Indices');
+      await page.locator('.history-rounds').evaluate(node => { node.scrollTop = 0; });
       await page.screenshot({ path: `output/playwright/v1.3.2-${process.env.RENE_CLUE_CAPTURE ?? 'after'}-${count}-${width}x${height}.png` });
       await expectCardIdentities(page);
       expect(await relativeSlots(page), `stable slots at ${width}×${height}`).toEqual(waitingSlots.get(`${width}x${height}`));
@@ -149,8 +155,10 @@ for (const count of [4, 6, 8, 12]) test(`all current clues remain readable with 
       expect(panel.y).toBeGreaterThanOrEqual(0);
       expect(panel.x + panel.width).toBeLessThanOrEqual(width);
       expect(panel.y + panel.height).toBeLessThanOrEqual(height);
+      const compact = await page.locator('.layout-mobile').isVisible();
       for (const selector of ['.clues-zone', '.history-rounds', '.current-round', '.current-round ol', '.current-round li']) {
-        expect(await page.locator(selector).evaluateAll(nodes => nodes.map(node => ({ width: node.clientWidth, scrollWidth: node.scrollWidth, height: node.clientHeight, scrollHeight: node.scrollHeight })).filter(node => node.scrollWidth > node.width + 1 || node.scrollHeight > node.height + 1)), `${selector} at ${width}×${height}, ${count} players`).toEqual([]);
+        const allowVerticalScroll = compact && selector === '.history-rounds';
+        expect(await page.locator(selector).evaluateAll((nodes, allowScroll) => nodes.map(node => ({ width: node.clientWidth, scrollWidth: node.scrollWidth, height: node.clientHeight, scrollHeight: node.scrollHeight })).filter(node => node.scrollWidth > node.width + 1 || (!allowScroll && node.scrollHeight > node.height + 1)), allowVerticalScroll), `${selector} at ${width}×${height}, ${count} players`).toEqual([]);
       }
       for (const selector of ['.gameplay-zone', '.voice-panel', '.chat-panel', '.drawer-tabs']) {
         if (!await page.locator(selector).isVisible()) continue;
@@ -164,7 +172,30 @@ for (const count of [4, 6, 8, 12]) test(`all current clues remain readable with 
         await expect(page.getByRole('button', { name: 'Maintenir pour parler · V', exact: true })).toBeInViewport({ ratio: 1 });
         expect(await peers()).toBe(connectedPeers);
       }
-      for (const card of await page.locator('.current-round li').all()) await expect(card).toBeInViewport({ ratio: 1 });
+      // Small screens preserve complete, readable cards in one native scroll region.
+      // Every card must be reachable without moving the gameplay or voice controls.
+      for (const card of await page.locator('.current-round li').all()) {
+        if (compact) await card.scrollIntoViewIfNeeded();
+        await expect(card).toBeInViewport({ ratio: 0.99 });
+      }
+      if (compact && count === 12 && width === 390) {
+        const region = page.getByRole('region', { name: 'Indices publics', exact: true });
+        await region.evaluate(node => { node.scrollTop = 0; });
+        await region.focus();
+        const pose = () => page.evaluate(async () => {
+          const storePath = '/src/store.ts'; const posesPath = '/src/poses.ts';
+          const [{ useGame }, { getPose }] = await Promise.all([import(storePath), import(posesPath)]);
+          const state = useGame.getState(); const player = state.room!.players.find((p: { id: string }) => p.id === state.session!.playerId)!;
+          return getPose(player.id, player.position);
+        });
+        const before = await pose();
+        await page.keyboard.press('PageDown');
+        await expect.poll(() => region.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
+        expect(await pose()).toEqual(before);
+        await expect(page.locator('.voice-panel')).toBeInViewport({ ratio: 1 });
+        await expect(page.locator('.drawer-tabs')).toBeInViewport({ ratio: 1 });
+      }
+      await page.locator('.history-rounds').evaluate(node => { node.scrollTop = 0; });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     }
     await page.setViewportSize({ width: 1586, height: 992 });

@@ -4,7 +4,9 @@ import { joinFour, showPanel, submitDescription } from './helpers';
 async function pose(page: Page, name: string) {
   return page.evaluate(async name => {
     const modulePath = '/src/store.ts'; const { useGame } = await import(modulePath);
-    return useGame.getState().room.players.find((p: { name: string }) => p.name === name).position as { x: number; z: number; yaw: number };
+    const posesPath = '/src/poses.ts'; const { getPose } = await import(posesPath);
+    const player = useGame.getState().room.players.find((p: { name: string }) => p.name === name);
+    return getPose(player.id, player.position) as { x: number; z: number; yaw: number };
   }, name);
 }
 async function walk(page: Page, observer: Page, name: string) {

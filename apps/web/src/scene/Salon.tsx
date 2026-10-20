@@ -1,6 +1,7 @@
 import { Html } from '@react-three/drei';
+import { memo } from 'react';
 function Block({ position, scale, color, rotation = [0, 0, 0] }: { position: [number, number, number]; scale: [number, number, number]; color: string; rotation?: [number, number, number] }) { return <mesh position={position} scale={scale} rotation={rotation}><boxGeometry /><meshLambertMaterial color={color} /></mesh>; }
-export function Salon({ fragment = false }: { fragment?: boolean }) {
+export const Salon = memo(function Salon({ fragment = false }: { fragment?: boolean }) {
   return <><color attach="background" args={['#EED7D1']} /><group><ambientLight intensity={1.7} /><directionalLight position={[3, 10, 8]} intensity={1.5} />
     <Block position={[0, -.15, 0]} scale={[15, .3, 11]} color="#E8B5C2" />
     {Array.from({ length: 11 }, (_, i) => <Block key={i} position={[0, .004, i - 5]} scale={[15, .008, .018]} color="#d798aa" />)}
@@ -14,4 +15,4 @@ export function Salon({ fragment = false }: { fragment?: boolean }) {
     <group position={[-5.6, 0, -2.8]}><Block position={[0, .65, 0]} scale={[2, .35, 1.1]} color="#087BA0" /><Block position={[0, 1.2, -.48]} scale={[2, 1, .22]} color="#087BA0" /><Block position={[-.95, 1, 0]} scale={[.22, .7, 1.2]} color="#087BA0" /><Block position={[.95, 1, 0]} scale={[.22, .7, 1.2]} color="#087BA0" /><Block position={[-.45, .92, -.1]} scale={[.55, .35, .6]} color="#F5E742" rotation={[.2, -.1, .2]} />{[-.7, .7].map(x => <Block key={x} position={[x, .25, 0]} scale={[.17, .5, .7]} color="#191719" />)}</group>
     <group position={[6, 0, -3.5]}><mesh position={[0, .08, 0]}><cylinderGeometry args={[.48, .48, .12, 12]} /><meshLambertMaterial color="#191719" /></mesh><Block position={[0, 1.3, 0]} scale={[.065, 2.6, .065]} color="#191719" /><mesh position={[0, 2.65, 0]} rotation={[0, 0, .1]}><coneGeometry args={[.8, .65, 8, 1, true]} /><meshLambertMaterial color="#EE89BA" side={2} /></mesh></group>
   </group></>;
-}
+});

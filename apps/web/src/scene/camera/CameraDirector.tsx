@@ -1,7 +1,8 @@
-import { useRef, type MutableRefObject } from 'react';
+import { useEffect, useRef, type MutableRefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { MathUtils, Vector3, type PerspectiveCamera } from 'three';
 import type { AvatarAppearance, RoomSnapshot } from '@rene/contracts';
+import { getPose } from '../../poses';
 import { buildAvatarModel } from '../../avatar/model';
 import type { ClearArea } from '../../components/useRoomViewport';
 import { cameraDistance, phaseShot, shotKey, TPS, type OrbitState } from './math';
@@ -14,6 +15,10 @@ export function CameraDirector({ room, playerId, area, orbit, reduced }: { room:
   const { camera, size } = useThree();
   const data = useRef({ key: '', since: 0, ready: false, yaw: Math.PI, pitch: TPS.pitch as number, target: new Vector3(), desired: new Vector3(), position: new Vector3(), direction: new Vector3(), boom: TPS.distance as number, hidden: [] as string[] });
   const currentKey = shotKey(room.game);
+  // Projection depends on the HUD/viewport, not the animation frame or pose stream.
+  useEffect(() => {
+    (camera as PerspectiveCamera).setViewOffset(size.width, size.height, size.width / 2 - area.left - area.width / 2, size.height / 2 - area.top - area.height / 2, size.width, size.height);
+  }, [camera, size.width, size.height, area.left, area.top, area.width, area.height]);
   useFrame((_state, delta) => {
     const d = data.current; const dt = Math.min(delta, .1); const now = performance.now(); const key = currentKey;
     if (d.key !== key) { d.key = key; d.since = d.ready ? now : now - 10000; }
@@ -21,22 +26,22 @@ export function CameraDirector({ room, playerId, area, orbit, reduced }: { room:
     const local = room.players.find(p => p.id === playerId);
     const id = shot === 'speaker' ? room.game?.turnPlayerId : shot === 'elimination' ? room.game?.eliminatedPlayerId : playerId;
     const focus = room.players.find(p => p.id === id && p.connected) ?? local;
-    const group = shot === 'group'; let x = focus?.position.x ?? 0; let z = focus?.position.z ?? 0;
+    const position = focus ? getPose(focus.id, focus.position) : undefined;
+    const group = shot === 'group'; let x = position?.x ?? 0; let z = position?.z ?? 0;
     if (group) {
       let count = 0; x = 0; z = 0;
-      for (const p of room.players) if (room.game?.phase === 'results' ? p.connected : p.alive && !p.waiting) { x += p.position.x; z += p.position.z; count++; }
+      for (const p of room.players) if (room.game?.phase === 'results' ? p.connected : p.alive && !p.waiting) { const pose = getPose(p.id, p.position); x += pose.x; z += pose.z; count++; }
       x /= Math.max(1, count); z /= Math.max(1, count);
     }
     const height = avatarHeight(focus?.appearance);
     d.desired.set(x, group ? 1.5 : height * .45, z);
     d.target.lerp(d.desired, reduced || !d.ready ? 1 : 1 - Math.exp(-TPS.damping * dt));
     const cam = camera as PerspectiveCamera;
-    cam.setViewOffset(size.width, size.height, size.width / 2 - area.left - area.width / 2, size.height / 2 - area.top - area.height / 2, size.width, size.height);
     const fy = Math.max(.18, area.height / size.height); const fx = Math.max(.2, area.width / size.width); const tan = Math.tan(TPS.fov * Math.PI / 360);
     let distance = Math.max(TPS.distance, height * 1.2 / (2 * tan * fy)); let pitch = orbit.current.pitch; let yaw = orbit.current.yaw;
     if (group) {
       let radius = 3.6;
-      for (const p of room.players) if (p.alive || room.game?.phase === 'results') radius = Math.max(radius, Math.hypot(p.position.x - x, p.position.z - z) + 1.5);
+      for (const p of room.players) if (p.alive || room.game?.phase === 'results') { const pose = getPose(p.id, p.position); radius = Math.max(radius, Math.hypot(pose.x - x, pose.z - z) + 1.5); }
       distance = Math.max(10, 1.2 * radius / (tan * Math.min(fy, fx * size.width / size.height))); pitch = .9; yaw = .4;
     }
     d.yaw = reduced || !d.ready ? yaw : MathUtils.damp(d.yaw, d.yaw + Math.atan2(Math.sin(yaw - d.yaw), Math.cos(yaw - d.yaw)), 9, dt);

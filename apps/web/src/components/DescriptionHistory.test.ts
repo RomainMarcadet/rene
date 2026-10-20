@@ -28,9 +28,9 @@ describe('current clues and public identities', () => {
     expect(render(null)).not.toContain('data-player-id');
     expect(render(null)).toContain('Les premiers indices arriveront avec la partie.');
   });
-  it('uses the same accessible number and palette with arbitrary names, without a mark in the lobby', () => {
+  it('identifies players by name and colour without assigning visible numbers', () => {
     const html = renderToStaticMarkup(createElement(PlayerName, { name: 'René & amis', mark: 11 }));
-    expect(html).toContain('aria-label="Repère 12"'); expect(html).toContain('--player-color:#B53070');
+    expect(html).not.toContain('Repère'); expect(html).not.toContain('player-token'); expect(html).toContain('--player-color:#B53070');
     expect(html).toContain('René &amp; amis');
     const lobby = renderToStaticMarkup(createElement(PlayerName, { name: 'René' }));
     expect(lobby).not.toContain('player-token'); expect(lobby).not.toContain('data-player-mark');
@@ -43,6 +43,7 @@ describe('current clues and public identities', () => {
       expect(card).toContain(`data-appearance="${[p.appearance.head, p.appearance.hair, p.appearance.eyes, p.appearance.mouth, p.appearance.nose, p.appearance.accessory].join(':')}"`);
       expect(card).toContain('clue-portrait');
       expect(card).toContain('--player-color:');
+      expect(card.indexOf('clue-author')).toBeLessThan(card.indexOf('clue-text'));
     }
     expect(html).toContain('aria-label="À son tour"');
     expect(html).not.toContain('Parle');

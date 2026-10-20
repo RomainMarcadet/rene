@@ -6,8 +6,10 @@ test('new category filters distribute only fictional private words in browser va
   const { contexts, pages } = await joinFour(browser, baseURL!);
   try {
     await pages[0].getByRole('button', { name: 'Paramètres ⚙', exact: true }).click();
-    await expect(pages[0].getByLabel(/^Catégorie/u).locator('option')).toHaveCount(16);
-    await pages[0].getByLabel(/^Catégorie/u).selectOption('cinema');
+    await expect(pages[0].locator('.word-theme-grid input[type=checkbox]')).toHaveCount(15);
+    await expect(pages[0].getByRole('checkbox', { name: /Activer le pack 18/ })).not.toBeChecked();
+    await pages[0].getByRole('button', { name: 'Tout décocher' }).click();
+    await pages[0].getByRole('checkbox', { name: 'Cinéma', exact: true }).check();
     await pages[0].getByLabel(/^Difficulté/u).selectOption('hard');
     await pages[0].getByRole('button', { name: 'Enregistrer les règles', exact: true }).click();
     for (const page of pages) await page.getByRole('button', { name: 'Je suis prêt →', exact: true }).click();

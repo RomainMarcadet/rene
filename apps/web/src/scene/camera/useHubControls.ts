@@ -14,7 +14,7 @@ export function useHubControls(room: RoomSnapshot, orbit: MutableRefObject<Orbit
   useEffect(() => {
     const reset = () => { keys.current.clear(); touch.current.x = 0; touch.current.z = 0; }; resetRef.current = reset;
     const down = (event: KeyboardEvent) => {
-      if (controlsBlocked(event.target) || !visible) return;
+      if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing || controlsBlocked(event.target) || !visible) return;
       const value = event.key.toLowerCase();
       if (value === 'r' && !event.repeat) { onRecenter.current(); return; }
       if (['z', 'q', 's', 'd', 'w', 'a', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(value)) { event.preventDefault(); keys.current.add(value); orbit.current.interrupted = key; }

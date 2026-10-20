@@ -1,4 +1,4 @@
-import { lazy, Suspense, useLayoutEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { socialPhaseAllowed, type RoomSnapshot } from '@rene/contracts';
 import { notify, saveProfile, send, useGame } from '../store';
 import { AvatarEditor } from './AvatarEditor';
@@ -22,7 +22,7 @@ export function RoomView({ room }: { room: RoomSnapshot }) {
   const player = room.players.find(p => p.id === me)!;
   const [modal, setModal] = useState<'avatar' | 'settings' | 'leave' | 'invite' | 'help' | null>(null);
   const [appearance, setAppearance] = useState(player.appearance); const [name, setName] = useState(player.name);
-  const [drawer, setDrawer] = useState<Drawer | null>(null);
+  const [drawer, setDrawer] = useState<Drawer | null>(() => player.waiting && room.game && room.game.phase !== 'results' ? 'clues' : null);
   const [expanded, setExpanded] = useState(false);
   const [socialOpen, setSocialOpen] = useState(false);
   const viewport = useRoomViewport(); const root = useRef<HTMLElement>(null);
@@ -31,6 +31,10 @@ export function RoomView({ room }: { room: RoomSnapshot }) {
   const showSuspects = viewport.layout === 'desktop' || drawer === 'suspects';
   const showClues = viewport.layout === 'desktop' || drawer === 'clues';
   const showChat = viewport.layout !== 'mobile' || drawer === 'discussion';
+  useEffect(() => {
+    // A waiting player must reach their private word when the next game begins.
+    if (room.game?.phase === 'reveal' && !player.waiting) setDrawer(null);
+  }, [room.game?.id, room.game?.phase, player.waiting]);
   useLayoutEffect(() => {
     const element = root.current; if (!element) return;
     const panels = [...element.querySelectorAll<HTMLElement>('[data-occluder]')];
@@ -49,17 +53,17 @@ export function RoomView({ room }: { room: RoomSnapshot }) {
   function customize() { setAppearance(player.appearance); setName(player.name); setModal('avatar'); }
   return <main ref={root} className={`room-page layout-${viewport.layout} ${drawer ? 'drawer-open' : ''} ${drawer === 'clues' ? 'clues-open' : ''} ${room.game ? 'in-game' : ''} ${expanded ? 'chat-expanded' : ''}`} style={{ height: viewport.height, top: viewport.top, left: viewport.left, width: viewport.width }}>
     <section className="scene-panel" aria-label="Le salon 3D partagé">
-      <SceneBoundary><Suspense fallback={<div className="scene-loading">On arrange les coussins…</div>}><Hub room={room} playerId={me} speaking={speaking} clearArea={clearArea} compact={viewport.layout === 'mobile'} paused={!!modal} controlsVisible={!drawer && !expanded && !modal && !socialOpen} /></Suspense></SceneBoundary>
+      <SceneBoundary><Suspense fallback={<div className="scene-loading">On arrange les coussins…</div>}><Hub room={room} playerId={me} speaking={speaking} clearArea={clearArea} compact={viewport.layout === 'mobile'} paused={!!modal} controlsVisible={(viewport.layout === 'desktop' || !drawer) && !expanded && !modal} /></Suspense></SceneBoundary>
     </section>
     <div className="navigation-zone" data-occluder><RoomNavigation room={room} compact={viewport.layout === 'mobile'} onOpen={setModal} onInvite={invite} /></div>
     <div className="scene-caption"><span className="pill">CHEZ RENÉ</span><span>{room.players.filter(p => p.connected).length} / 12 DANS LE SALON</span></div>
     <SocialControls room={room} open={socialOpen} setOpen={setSocialOpen} />
     <div className="room-overlay">
-      <div className="gameplay-zone" data-occluder><Gameplay room={room} /></div>
+      <div className="gameplay-zone" data-occluder><Gameplay room={room} onShowClues={() => setDrawer('clues')} onEditThemes={room.hostId === me ? () => setModal('settings') : undefined} /></div>
       <div id="room-suspects" className="suspects-zone" hidden={!showSuspects} data-occluder><Suspects room={room} onCustomize={customize} /></div>
       <div id="room-clues" className="clues-zone" hidden={!showClues} data-occluder><DescriptionHistory key={room.game?.id ?? 'lobby'} game={room.game} players={room.players} visible={showClues} /></div>
       <Communication room={room} visible={showChat} onExpand={setExpanded} />
-      <nav className="drawer-tabs" aria-label="Panneaux du salon" data-occluder>{([['suspects', 'Suspects'], ['clues', 'Indices'], ['discussion', 'Discussion']] as const).map(([tab, label]) => <button key={tab} aria-expanded={drawer === tab} aria-controls={tab === 'discussion' ? 'room-discussion' : `room-${tab}`} onClick={() => setDrawer(drawer === tab ? null : tab)}>{label}{tab === 'suspects' ? ` · ${room.players.length}` : tab === 'clues' && room.game?.descriptions.length ? ` · ${room.game.descriptions.length}` : ''}<span>{drawer === tab ? '⌄' : '⌃'}</span></button>)}<button id="room-social-button" className="drawer-social" data-invite={room.social.interactions.some(i => i.toId === me && i.state === 'invited') || undefined} aria-label="Gestes du salon" disabled={!socialPhaseAllowed(room.game?.phase)} onClick={() => setSocialOpen(true)}>＋</button></nav>
+      <nav className="drawer-tabs" aria-label="Panneaux du salon" data-occluder>{([['suspects', 'Suspects'], ['clues', 'Indices'], ['discussion', 'Discussion']] as const).map(([tab, label]) => <button key={tab} aria-expanded={drawer === tab} aria-controls={tab === 'discussion' ? 'room-discussion' : `room-${tab}`} onClick={() => setDrawer(drawer === tab ? null : tab)}>{label}{tab === 'suspects' ? ` · ${room.players.length}` : tab === 'clues' && room.game?.descriptions.length ? ` · ${room.game.descriptions.length}` : ''}<span>{drawer === tab ? '⌄' : '⌃'}</span></button>)}<button id="room-social-button" className="drawer-social" data-invite={room.social.interactions.some(i => i.toId === me && i.state === 'invited') || undefined} aria-label="Gestes du salon" disabled={!socialPhaseAllowed(room.game?.phase)} onClick={() => setSocialOpen(true)}>+</button></nav>
     </div>
     {modal === 'help' && <HowToPlay onClose={() => setModal(null)} />}
     {modal === 'avatar' && <Modal title="Une tête à vous." onClose={() => setModal(null)}><label className="field">Votre petit nom<input value={name} maxLength={24} onChange={e => setName(e.target.value)} /></label><AvatarEditor value={appearance} onChange={setAppearance} /><button className="button button-yellow wide" disabled={!name.trim()} onClick={async () => { if (await send({ type: 'profile.update', name, appearance })) { saveProfile(name, appearance); setModal(null); } }}>Voilà ma nouvelle tête →</button></Modal>}

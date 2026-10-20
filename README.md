@@ -65,11 +65,14 @@ Le bouton **COMMENT JOUER ?** sur l’accueil et **Comment jouer ?** dans le sal
 | `npx playwright install chromium` | Installer Chromium pour les tests navigateur |
 | `npm run test:e2e` | Parcours multijoueur et mobile Playwright ; audio ignoré explicitement |
 | `RENE_VOICE_E2E=1 npm run test:e2e` | Même recette avec LiveKit local réel et microphones synthétiques |
-| `npm run build` | Compiler le client et le serveur |
+| `npm run build` | Compiler le client et le serveur, et vérifier que la banque de mots reste hors du client |
+| `npm run audit:word-boundary` | Contrôler les ressources frontend déjà construites |
 | `npm run db:generate` | Générer le client Prisma |
 | `npm run db:migrate` | Appliquer les migrations PostgreSQL versionnées |
 
 Playwright démarre ses serveurs isolés sur **5175** et **3005**, sans réutiliser votre serveur de développement. Le mode vocal suppose `docker compose up -d --wait livekit` et la configuration locale de `deploy/livekit.dev.yaml` sur 7880/7881/7882. Les tests n’utilisent pas de base de données ; les vérifications de persistance nécessitent PostgreSQL séparément. Les captures de recette sont écrites dans `output/playwright/` (non versionné).
+
+Pour employer un Chromium déjà installé, `RENE_CHROMIUM_EXECUTABLE_PATH` permet de fournir son chemin absolu aux tests. Sans cette variable, Playwright utilise son navigateur habituel.
 
 Le résultat des tests locaux et les vérifications restant à réaliser sont décrits dans [la recette](docs/acceptance.md). La CI prépare PostgreSQL, contrôle le code et exécute les tests navigateur. Aucun workflow ne publie d'image ni ne déploie automatiquement.
 
@@ -80,6 +83,29 @@ La V1.3 fait du hub une scène plein écran, avec les panneaux de jeu superposé
 Les validations de la V1.1, le diagnostic audio et les limites de la recette sont détaillés dans [le compte rendu V1.1](docs/v1.1.md). La recette automatisée emploie des clients indépendants et des données serveur réelles ; l’écoute humaine, Safari/mobile physique et les réseaux distants restent à valider sur l’hébergement cible.
 
 L'image Docker sur le **port 8080** a également été compilée et testée dans une pile isolée avec PostgreSQL et Caddy 2.11.4 : migrations, frontend/API en HTTPS, quatre clients Socket.IO (polling et WebSocket), chat et cookies invités sont validés. Les certificats de cette recette sont internes ; le vocal reste à vérifier sur le serveur réel. Voir [les preuves de cette recette Docker/Caddy](docs/acceptance.md).
+
+## Jouer dans le salon
+
+Les cartes affichent le nom du joueur en grand, puis son indice complet. Sur petit écran, le panneau d’indices défile en gardant les commandes de partie et de vocal accessibles. Dans la scène, le nom reste compact et l’indice se consulte au survol ou au focus clavier. Les couleurs et portraits complètent cette identité ; les numéros attribués ne sont plus affichés.
+
+| Commande | Action |
+| --- | --- |
+| ZQSD, WASD ou flèches | Se déplacer par rapport à la caméra |
+| Glisser sur la scène / R | Tourner la caméra / recentrer sur soi |
+| H / J / K | Saluer / danser / exprimer un soupçon |
+| E | Choisir un voisin proche |
+| Clic ou toucher sur un avatar ou son nom | Ouvrir ses interactions |
+| B / Échap | Ouvrir les gestes / fermer la palette |
+| F / X | Frapper / arrêter son animation |
+| V | Parler avec le microphone en mode appuyer-pour-parler |
+
+Les raccourcis de gestes restent inactifs pendant la saisie. La palette laisse le salon accessible et les interactions à deux conservent leur demande d’accord.
+
+Un nouveau joueur arrivé pendant une partie voit les indices publics et participe à la suivante. Un joueur qui recharge ou se reconnecte avec sa session retrouve sa place. Quitter volontairement abandonne la place dans la partie en cours. L’hôte revient au salon après les résultats, puis tous les participants se déclarent prêts.
+
+Le bouton **Choisir les thèmes** permet à l’hôte de sélectionner plusieurs catégories. Tous voient la sélection avant de se déclarer prêts. Le catalogue comporte 15 thèmes classiques et un pack **18+ · Politique & humour noir**, désactivé par défaut ; le pack peut être joué seul ou combiné aux autres thèmes. Les associations restent privées jusqu’à leur distribution dans la partie.
+
+Le [rapport du correctif](docs/playability-performance-themes.md) détaille les modifications, les mesures et les limites de validation.
 
 ## Configuration
 

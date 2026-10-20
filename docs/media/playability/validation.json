@@ -1,0 +1,79 @@
+{
+  "date": "2026-10-20",
+  "sourceTreeSha": "80a4842c984a451f4354dbb82a2c7c7400b9cc38",
+  "baseMainSha": "d9c4621bd2f9a7cb37633891bb6cebae1137b0c0",
+  "codeCheck": {
+    "command": "npm run check",
+    "exitCode": 0,
+    "testFilesPassed": 29,
+    "testsPassed": 353,
+    "typecheck": "passed",
+    "lint": "passed",
+    "webBuild": "passed",
+    "serverBuild": "passed",
+    "clientAssetsChecked": 8,
+    "catalogueBoundaryViolations": 0
+  },
+  "browser": {
+    "initialFullSuite": {
+      "voiceEnabled": false,
+      "registered": 32,
+      "passed": 21,
+      "failed": 4,
+      "skipped": 7,
+      "durationMinutes": 11.1
+    },
+    "finalTargetedSuite": {
+      "voiceEnabled": true,
+      "registered": 16,
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "durationMinutes": 8.9
+    },
+    "distinctScenariosPassedAcrossRuns": 32,
+    "allInitialFailuresSuccessfullyRetested": true,
+    "allInitiallySkippedVoiceScenariosSuccessfullyTested": true,
+    "thirdFullSuiteRun": false,
+    "playerCounts": [
+      4,
+      6,
+      8,
+      12
+    ],
+    "viewports": [
+      [
+        1586,
+        992
+      ],
+      [
+        1366,
+        768
+      ],
+      [
+        1024,
+        768
+      ],
+      [
+        768,
+        1024
+      ],
+      [
+        390,
+        844
+      ],
+      [
+        844,
+        390
+      ]
+    ],
+    "playwrightVersion": "1.64.0",
+    "chromiumExecutedVersion": "141.0.7390.37",
+    "livekitVersion": "1.13.9"
+  },
+  "scopeLimits": [
+    "Local test infrastructure and browser viewports; no physical phone or Safari run.",
+    "No production network, server-load or FPS measurement.",
+    "No deployment or database migration."
+  ]
+}

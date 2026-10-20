@@ -1,4 +1,4 @@
-import type { Personality, PublicPlayer } from '@rene/contracts';
+import type { Personality, Position, PublicPlayer } from '@rene/contracts';
 import type { Pose } from './types';
 export function characterSeed(id: string) { let n = 0; for (let i = 0; i < id.length; i++) n = (n * 31 + id.charCodeAt(i)) >>> 0; return n % 997 / 997 * Math.PI * 2; }
 export interface FaceMotion { blink: number; talk: number; look: number }
@@ -30,13 +30,16 @@ export function personalityPose(p: Pose, time: number, personality: Personality,
   // Suspicion already owns the head turn. Voice can animate the mouth without steering that pose.
   if (p.state !== 'suspect') p.headY += Math.max(-.45, Math.min(.45, gaze));
 }
-export function speakerGaze(player: PublicPlayer, players: PublicPlayer[], speaking: string[]) {
+export function speakerGaze(player: PublicPlayer, players: PublicPlayer[], speaking: string[], position: (id: string, fallback: Position) => Position = (_id, fallback) => fallback) {
+  const origin = position(player.id, player.position);
   let best: PublicPlayer | undefined; let distance = 36;
   for (const p of players) if (p.id !== player.id && p.connected && speaking.includes(p.id)) {
-    const d = (p.position.x - player.position.x) ** 2 + (p.position.z - player.position.z) ** 2;
+    const target = position(p.id, p.position);
+    const d = (target.x - origin.x) ** 2 + (target.z - origin.z) ** 2;
     if (d < distance || d === distance && p.id < (best?.id ?? '')) { best = p; distance = d; }
   }
   if (!best) return 0;
-  const yaw = Math.atan2(best.position.x - player.position.x, best.position.z - player.position.z) - player.position.yaw;
+  const target = position(best.id, best.position);
+  const yaw = Math.atan2(target.x - origin.x, target.z - origin.z) - origin.yaw;
   return Math.atan2(Math.sin(yaw), Math.cos(yaw));
 }
