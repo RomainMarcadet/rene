@@ -32,6 +32,6 @@ export const AvatarHead = memo(function AvatarHead({ appearance, eliminated = fa
   return <group name={`appearance:${appearance.head}:${appearance.hair}:${appearance.eyes}:${appearance.mouth}:${appearance.nose}:${appearance.accessory}`}>
     {[...model.head.parts, ...model.hair, ...model.nose, ...model.accessory].map((part, index) => <PartMesh key={index} part={part} appearance={appearance} eliminated={eliminated} />)}
     <group ref={eyes}>{model.eyes.map((part, index) => <PartMesh key={index} part={part} appearance={appearance} eliminated={eliminated} />)}</group>
-    <group ref={mouth}>{model.mouth.map((part, index) => <PartMesh key={index} part={part} appearance={appearance} eliminated={eliminated} />)}</group>
+    <group ref={mouth} name="avatar-mouth">{model.mouth.map((part, index) => <PartMesh key={index} part={part} appearance={appearance} eliminated={eliminated} />)}</group>
   </group>;
 });

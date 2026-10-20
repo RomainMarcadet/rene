@@ -22,7 +22,9 @@ describe('public cosmetic personality layer', () => {
   it('never overrides physical, ground or voluntary poses; never invents voice activity', () => {
     for (const state of ['stunned_loop', 'get_up', 'play_dead', 'punch', 'kneel', 'macarena_full', 'eliminated']) {
       const p = avatarPose({ time: 1, now: 1000, moving: false, reduced: false }); p.state = state; const before = { ...p }; const f = { blink: 1, talk: 0, look: 0 };
-      personalityPose(p, 1, 'nervous', 2, false, true, 1, f); expect(p).toEqual(before); expect(f).toEqual({ blink: 1, talk: 0, look: 0 });
+      personalityPose(p, 1, 'nervous', 2, false, true, 1, f); expect(p).toEqual(before);
+      expect(f).toMatchObject({ blink: 1, look: 0 }); expect(f.talk).toBeGreaterThan(0);
+      personalityPose(p, 1, 'nervous', 2, false, false, 1, f); expect(p).toEqual(before); expect(f.talk).toBe(0);
     }
     const p = sample('nervous', true); expect(p.face).toEqual({ blink: 1, talk: .25, look: 0 });
   });

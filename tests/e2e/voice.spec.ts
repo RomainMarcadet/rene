@@ -1,8 +1,9 @@
 import { test, expect, type Browser, type Page } from '@playwright/test';
 import { setMicrophoneMode, showPanel, submitDescription, voiceSettings } from './helpers';
+import { livingUI } from './livingRoomFixture';
 
 test.skip(process.env.RENE_VOICE_E2E !== '1', 'Requires the local LiveKit service (RENE_VOICE_E2E=1).');
-test.use({ launchOptions: { args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'] } });
+test.use({ launchOptions: { args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required', ...(process.env.RENE_VOICE_SAMPLE ? ['--use-file-for-fake-audio-capture=' + process.env.RENE_VOICE_SAMPLE] : [])] } });
 
 async function pair(browser: Browser, baseURL: string) {
   const contexts = await Promise.all([0, 1].map(() => browser.newContext({ baseURL, permissions: ['microphone'] })));
@@ -49,6 +50,32 @@ test('muting the microphone keeps a subscribed, playing remote audio track', asy
     expect(await pages[0].locator('.voice-panel audio').evaluateAll(nodes => nodes.every(node => (node as HTMLAudioElement).muted))).toBe(true);
     await expect(pages[0].locator('.microphone-state')).toContainText('coupé');
     await pages[0].getByRole('button', { name: 'Écoute : désactivée', exact: true }).click();
+  } finally { await Promise.all(contexts.map(c => c.close())); }
+});
+
+test('remote speech animates the mouth throughout an articulated emote', async ({ browser, baseURL }) => {
+  test.skip(!process.env.RENE_VOICE_SAMPLE, 'Requires an original speech WAV via RENE_VOICE_SAMPLE for LiveKit voice activity detection.');
+  const { contexts, pages } = await pair(browser, baseURL!);
+  try {
+    const sender = pages[1]; const observer = pages[0];
+    const senderId = await sender.evaluate(async () => { const path = '/src/store.ts'; return (await import(path)).useGame.getState().session.playerId; });
+    await setMicrophoneMode(sender, 'open');
+    await sender.getByRole('button', { name: 'Ouvrir mon microphone', exact: true }).click();
+    await expect.poll(() => received(observer)).toBeGreaterThan(1000);
+    const face = () => observer.evaluate(async id => {
+      const path = '/src/store.ts'; const store = (await import(path)).useGame.getState();
+      const scenePath = '/node_modules/.vite/deps/@react-three_fiber.js'; const { _roots } = await import(scenePath);
+      const root = [..._roots.values()].find(r => r.store.getState().gl.domElement.closest('.hub-canvas'));
+      return { speaking: store.speaking.includes(id), kind: store.room.social.players[id]?.animation?.kind,
+        scale: root?.store.getState().scene.getObjectByName('player:' + id)?.getObjectByName('avatar-mouth')?.scale.y ?? 0 };
+    }, senderId);
+    await expect.poll(async () => (await face()).speaking).toBe(true);
+    expect(await livingUI(sender, { type: 'player.emote', kind: 'macarena_full' })).toBe(true);
+    await expect.poll(async () => { const f = await face(); return f.speaking && f.kind === 'macarena_full' && f.scale > 1.1; }).toBe(true);
+    await sender.getByRole('button', { name: 'Couper mon microphone', exact: true }).click();
+    await expect.poll(async () => (await face()).speaking).toBe(false);
+    await expect.poll(async () => (await face()).scale).toBe(1);
+    await expect(observer.locator('.voice-panel')).toContainText('Dans la conversation');
   } finally { await Promise.all(contexts.map(c => c.close())); }
 });
 

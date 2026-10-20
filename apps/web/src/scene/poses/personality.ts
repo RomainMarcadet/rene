@@ -7,14 +7,14 @@ export function personalityPose(p: Pose, time: number, personality: Personality,
   const base = p.state === 'idle' || p.state === 'walking';
   const social = base || p.state === 'waving' || p.state === 'suspect' || p.state === 'celebrating' || p.state === 'dancing';
   const t = time + seed;
-  face.blink = 1; face.talk = 0; face.look = 0;
+  // Speech is independent of the skeleton: a voluntary pose must not silence the face.
+  face.blink = 1; face.talk = speaking ? reduced ? .25 : .3 + Math.abs(Math.sin(time * 13)) * .9 : 0; face.look = 0;
   if (!social) return;
   if (!reduced) {
     const period = personality === 'nervous' ? 2.6 : 4.7; const blink = (t % period);
     face.blink = blink < .16 ? Math.max(.09, Math.abs(blink - .08) / .08) : 1;
     face.look = Math.sin(t * (personality === 'nervous' ? 2.5 : .5)) * .018;
-    face.talk = speaking ? .3 + Math.abs(Math.sin(time * 13)) * .9 : 0;
-  } else face.talk = speaking ? .25 : 0;
+  }
   if (base) {
     const energy = personality === 'impassive' ? .15 : personality === 'nervous' ? 1.4 : .7;
     if (!reduced) { p.y += Math.sin(t * 1.9) * .012 * energy; p.headZ += Math.sin(t * 1.3) * .035 * energy; }

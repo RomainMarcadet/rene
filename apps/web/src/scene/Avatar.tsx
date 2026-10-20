@@ -46,7 +46,7 @@ export function Avatar({ appearance: a, position = [0, 0, 0], yaw = 0, name, mar
     if (head.current) { head.current.rotation.set(p.headX, p.headY, p.headZ); head.current.position.z = MathUtils.damp(head.current.position.z, p.headForward, 18, dt); }
     if (stars.current) { stars.current.visible = p.stars; stars.current.rotation.y = reducedMotion ? 0 : (input.current.now - (social?.physical?.startedAt ?? input.current.now)) / 500; }
   }, -1);
-  return <group ref={group} position={initialPosition.current} onClick={onClick ? event => { event.stopPropagation(); onClick(); } : undefined}>
+  return <group ref={group} name={`player:${identity}`} position={initialPosition.current} onClick={onClick ? event => { event.stopPropagation(); onClick(); } : undefined}>
     {(speaking || selected) && <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .025, 0]}><ringGeometry args={[.7, .8, 24]} /><meshBasicMaterial color={speaking ? '#65B847' : '#F5E742'} /></mesh>}
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .015, 0]} scale={[.75, .5, 1]}><circleGeometry args={[1, 20]} /><meshBasicMaterial color="#191719" transparent opacity={.13} depthWrite={false} /></mesh>
     <group ref={puppet} name="avatar-puppet" scale={dead ? .85 : 1}>
