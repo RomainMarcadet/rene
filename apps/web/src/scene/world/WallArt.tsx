@@ -1,5 +1,7 @@
-import { useEffect, useMemo } from 'react';
-import { CanvasTexture, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace } from 'three';
+import { useEffect, useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { CanvasTexture, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace, type Group } from 'three';
+import { WORLD_WALLS } from '@rene/contracts';
 import { Block, Ball } from './Primitives';
 const plane = new PlaneGeometry(1, 1);
 /** Printed in the world: CSS perspective overlays ignore the HUD's off-axis frustum. */
@@ -17,7 +19,9 @@ function Sign({ title, subtitle, color, size, z }: { title: string; subtitle: st
   return <mesh position={[0, 0, z]} scale={size} geometry={plane} material={material} dispose={null} />;
 }
 export function WallArt() {
-  return <group position={[0, 0, -5.48]}>
+  const root = useRef<Group>(null);
+  useFrame(({ camera }) => { if (root.current) root.current.visible = camera.position.z > WORLD_WALLS[0].z + 1.5; });
+  return <group ref={root} position={[0, 0, WORLD_WALLS[0].z + .17]}>
     <group position={[-4.8, 2.8, 0]} rotation={[0, 0, -.035]}>
       <Block at={[0, 0, 0]} size={[2, 1.3, .05]} color="#191719" />
       <Sign title="ICI, ON DOUTE." subtitle="ENSEMBLE." color="#F34531" size={[1.85, 1.15, 1]} z={.04} />

@@ -46,9 +46,9 @@ export default function Hub({ room, playerId, speaking, clearArea, compact, cont
       })}
     </Canvas>
   </div>
-  {controlsVisible && <div className="camera-controls" style={{ left: Math.max(12, clearArea.left + 8), top: Math.max(80, clearArea.top + 8) }}>
-    <button aria-label="Recentrer la caméra" title="Recentrer · R" disabled={vote} onClick={recenter}>◎<span>Moi · R</span></button>
-    {!compact && <button aria-label="Vue collective" disabled={vote} aria-pressed={overview} onClick={() => { setOverview(!overview); orbit.current.overview = !overview; }}>▦<span>Ensemble</span></button>}
+  {controlsVisible && !vote && <div className="camera-controls" style={{ left: Math.max(12, clearArea.left + 8), top: Math.max(80, clearArea.top + (!compact && clearArea.left < 150 && clearArea.top < 160 ? 84 : 8)) }}>
+    <button aria-label="Recentrer la caméra" title="Recentrer · R" onClick={recenter}>◎<span>Moi · R</span></button>
+    {!compact && <button aria-label="Vue collective" aria-pressed={overview} onClick={() => { setOverview(!overview); orbit.current.overview = !overview; }}>▦<span>Ensemble</span></button>}
   </div>}
   <Joystick value={touch} visible={!vote && controlsVisible} area={clearArea} />
   </>;
