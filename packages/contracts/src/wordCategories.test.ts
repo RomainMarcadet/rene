@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CommandSchema, DEFAULT_SETTINGS, SettingsSchema, PUBLIC_WORD_CATEGORIES, selectedWordCategories, wordSelectionLabel } from './index.js';
+import { CommandSchema, DEFAULT_SETTINGS, SettingsSchema, selectedWordCategories, wordSelectionLabel } from './index.js';
 
 describe('word theme settings', () => {
   it('restores old room settings with an explicit default adult exclusion', () => {
@@ -8,7 +8,7 @@ describe('word theme settings', () => {
     expect(restored.categories).toEqual([]);
     expect(restored.adultContent).toBe(false);
     expect(selectedWordCategories(restored)).toEqual(['nature']);
-    expect(selectedWordCategories(DEFAULT_SETTINGS)).toEqual(PUBLIC_WORD_CATEGORIES);
+    expect(selectedWordCategories(DEFAULT_SETTINGS)).toEqual([...DEFAULT_SETTINGS.categories]);
   });
 
   it('prioritizes the selected themes over the old single category', () => {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PUBLIC_WORD_CATEGORIES, SettingsSchema, WORD_CATEGORY_LABELS, roleCounts, selectedWordCategories, validComposition, type RoomSnapshot, type WordCategory } from '@rene/contracts';
+import { POP_CULTURE_CATEGORIES, PUBLIC_WORD_CATEGORIES, SettingsSchema, WORD_CATEGORY_LABELS, roleCounts, selectedWordCategories, validComposition, type RoomSnapshot, type WordCategory } from '@rene/contracts';
 import { send } from '../store';
 import './settings.css';
 
@@ -27,7 +27,8 @@ export function Settings({ room, onClose }: { room: RoomSnapshot; onClose: () =>
       <legend>Les thèmes de votre soirée</legend>
       <p className="hint">Choisissez un ou plusieurs thèmes pour toute la salle. Les mots restent la surprise.</p>
       <div className="word-theme-presets">
-        <button className="button button-small" type="button" disabled={busy} onClick={() => setCategories([...PUBLIC_WORD_CATEGORIES, ...(settings.adultContent ? ['adulte' as const] : [])])}>Tous les thèmes classiques</button>
+        <button className="button button-small button-yellow" type="button" disabled={busy} onClick={() => setCategories([...POP_CULTURE_CATEGORIES, ...(settings.adultContent ? ['adulte' as const] : [])])}>Soirée pop culture</button>
+        <button className="button button-small" type="button" disabled={busy} onClick={() => setCategories([...PUBLIC_WORD_CATEGORIES, ...(settings.adultContent ? ['adulte' as const] : [])])}>Tout mélanger</button>
         <button className="button button-small" type="button" disabled={busy} onClick={() => { setCategories([]); setSettings(current => ({ ...current, adultContent: false })); }}>Tout décocher</button>
       </div>
       <div className="word-theme-grid">

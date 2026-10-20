@@ -7,6 +7,28 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// A canonical, stable pool of eligible pair IDs forms one scope. Progress survives room deletion.
+model WordCycle {
+  key        String   @id
+  cycle      Int      @default(1)
+  lastPairId String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  draws      WordDraw[]
+}
+
+model WordDraw {
+  gameId    String    @id
+  scopeKey  String
+  cycle     Int
+  pairId    String
+  createdAt DateTime  @default(now())
+  scope     WordCycle @relation(fields: [scopeKey], references: [key])
+
+  @@unique([scopeKey, cycle, pairId])
+  @@index([scopeKey, cycle])
+}
+
 model Guest {
   id         String   @id
   tokenHash  String   @unique

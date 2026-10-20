@@ -41,16 +41,15 @@ describe('room theme enforcement', () => {
     expect(rooms.snapshot(room, 6).settings.adultContent).toBe(true);
   });
 
-  it('preserves the expanded catalogue history through the final unseen selection', async () => {
+  it('uses the database reservation rather than trusting mutable room history', async () => {
     const { rooms, room } = await fixture();
-    const eligible = matchingWordPairs(DEFAULT_SETTINGS).map(pair => pair.id);
+    const eligible = matchingWordPairs({ ...DEFAULT_SETTINGS, categories: [] }).map(pair => pair.id);
     expect(eligible.length).toBeGreaterThan(1000);
     // Represents previous selections in this room, beyond the former 1,000-ID limit.
     room.usedWords = eligible.slice(0, -1);
     for (const id of room.players.keys()) await rooms.command(room, id, { type: 'player.ready', ready: true }, 2);
     await rooms.command(room, 'host', { type: 'game.start' }, 3);
-    expect(room.usedWords.at(-1)).toBe(eligible.at(-1));
+    expect(eligible).toContain(room.usedWords.at(-1));
     expect(room.usedWords).toHaveLength(eligible.length);
-    expect(new Set(room.usedWords).size).toBe(eligible.length);
   });
 });

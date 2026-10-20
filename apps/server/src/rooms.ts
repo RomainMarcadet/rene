@@ -3,7 +3,7 @@ import {
   ANIMATIONS, DEFAULT_SETTINGS, validComposition, canMoveInPhase, voteSeat, SALON_BOUNDS, walkable, clearWorldPath, spawnPoint, isSocialCommand, socialMovementAllowed, type AvatarAppearance, type ChatMessage, type ChatReaction,
   type Command, type PublicPlayer, type RoomSettings, type RoomSnapshot, type PrivatePlayerState,
 } from '@rene/contracts';
-import { createGame, applyGameAction, chooseWordPair, recordWordSelection, WORD_PAIRS, publicGame, privateGame, type GameState, type WordPair } from '@rene/engine';
+import { createGame, applyGameAction, chooseWordPair, matchingWordPairs, recordWordSelection, WORD_PAIRS, publicGame, privateGame, type GameState, type WordPair } from '@rene/engine';
 import { createSocial, createSocialPlayer, handleSocial, resetSocial, tickSocial, socialSnapshot, cancelSocialReferences, cancelVoluntary, type SocialRuntime, type ServerSocialPlayer } from './social.js';
 import type { Guest, Persistence } from './persistence.js';
 
@@ -116,8 +116,11 @@ export class Rooms {
         const players = [...room.players.values()];
         if (!validComposition(players.length, room.settings)) throw new Error('Il faut de 4 à 12 joueurs et une répartition valide.');
         if (!players.every(p => p.connected && p.ready)) throw new Error('Tout le monde doit être connecté et prêt.');
-        const pair = chooseWordPair(room.settings, room.usedWords, this.random, this.wordPairs);
-        room.game = createGame({ id: randomUUID(), playerIds: players.map(p => p.id), settings: room.settings, pair, now, random: this.random });
+        const gameId = randomUUID();
+        // Reserve atomically in PostgreSQL, not in the transient room history.
+        const pool = matchingWordPairs(room.settings, this.wordPairs);
+        const pair = await this.persistence.reserveWordPair(gameId, pool, this.random);
+        room.game = createGame({ id: gameId, playerIds: players.map(p => p.id), settings: room.settings, pair, now, random: this.random });
         resetSocial(room);
         recordWordSelection(room.usedWords, pair.id);
         room.chat = []; room.chatReactions.clear();

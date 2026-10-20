@@ -389,7 +389,7 @@ describe('real Socket.IO clients', () => {
     const saving = new Promise<void>(resolve => { entered = resolve; });
     const pending = new Promise<void>(resolve => { release = resolve; });
     let delay = false;
-    const persistence: Persistence = { getGuest: token => backing.getGuest(token), recordResult: (...args) => backing.recordResult(...args), close: () => backing.close(), saveGuest: async (value: Guest) => { if (delay) { entered(); await pending; } await backing.saveGuest(value); } };
+    const persistence: Persistence = { getGuest: token => backing.getGuest(token), recordResult: (...args) => backing.recordResult(...args), reserveWordPair: (...args) => backing.reserveWordPair(...args), wordPoolProgress: (...args) => backing.wordPoolProgress(...args), close: () => backing.close(), saveGuest: async (value: Guest) => { if (delay) { entered(); await pending; } await backing.saveGuest(value); } };
     const { running, url } = await server(persistence); const a = await actor(running, url); delay = true;
     a.socket.emit('command', { id: crypto.randomUUID(), command: { type: 'room.create', name: 'René', appearance: DEFAULT_APPEARANCE } }, () => undefined);
     await saving; a.socket.disconnect();
