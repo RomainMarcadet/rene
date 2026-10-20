@@ -155,13 +155,12 @@ test('prototype: authoritative punch, fifth impact, fall, recovery and protectio
     await page.locator('.avatar-label[data-player-id="' + target + '"]').focus();
     await expect(page.locator('.social-status').filter({ hasText: 'À terre' })).toBeVisible();
     expect((await send(f.actors[0], { type: 'player.attack', kind: 'punch', targetId: id })).ok).toBe(false);
-    const bodyRoll = await page.evaluate(async () => {
+    await expect.poll(() => page.evaluate(async () => {
       const path = '/node_modules/.vite/deps/@react-three_fiber.js'; const { _roots } = await import(path);
       const state = [..._roots.values()][0].store.getState(); let roll = 0;
       state.scene.traverse((object: { name: string; parent?: { parent?: { parent?: { rotation: { z: number } } } } }) => { if (object.name.startsWith('appearance:potato:buns:')) { let parent = object.parent as unknown as { name: string; rotation: { z: number }; parent?: typeof parent }; while (parent && parent.name !== 'avatar-puppet') parent = parent.parent!; roll = parent?.rotation.z ?? 0; } });
       return roll;
-    });
-    expect(bodyRoll).toBeLessThan(-.9);
+    }), { timeout: 5000 }).toBeLessThan(-.9);
 
     await expect(page.locator('.social-status').filter({ hasText: 'Protégé' })).toBeVisible({ timeout: 5000 });
     expect(await ui(page, { type: 'player.attack', kind: 'punch', targetId: target })).toBe(false);
