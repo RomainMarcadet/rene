@@ -57,3 +57,14 @@ export async function setMicrophoneMode(page: Page, mode: 'open' | 'ptt') {
   await page.locator('.voice-settings summary').click();
 }
 
+
+/** Keep auxiliary browser clients real without multiplying unrelated GPU contexts. */
+export async function force2DFallback(context: BrowserContext) {
+  await context.addInitScript(() => {
+    const original = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, ...args: Parameters<typeof original>) {
+      if (String(args[0]).includes('webgl')) return null;
+      return original.apply(this, args);
+    } as typeof original;
+  });
+}

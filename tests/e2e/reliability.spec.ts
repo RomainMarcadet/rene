@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { type RoomSnapshot } from '@rene/contracts';
-import { joinFour, submitDescription } from './helpers';
+import { joinFour, submitDescription, force2DFallback } from './helpers';
 
 async function state(page: Page) {
   return page.evaluate(async () => {
@@ -12,7 +12,12 @@ async function state(page: Page) {
 
 test('an arriving player sees existing clues on mobile, reconnects and joins the next game', async ({ browser, baseURL }) => {
   test.setTimeout(120000);
-  const { contexts, pages, names } = await joinFour(browser, baseURL!);
+  // Host and the reconnecting mobile guest retain real WebGL. Silent observers
+  // exercise the supported fallback so this lifecycle test is not a five-GPU benchmark.
+  const { contexts, pages, names } = await joinFour(browser, baseURL!, -1, async (context, index) => {
+    if (index > 0) await force2DFallback(context);
+  });
+  await Promise.all(pages.slice(1).map(page => expect(page.locator('.scene-fallback')).toBeVisible()));
   const guestContext = await browser.newContext({ baseURL, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const guest = await guestContext.newPage();
   try {
@@ -42,6 +47,7 @@ test('an arriving player sees existing clues on mobile, reconnects and joins the
         await expect(guest.locator('.current-round')).toContainText('Piste publique 2');
         await expect(guest.getByLabel('Votre indice', { exact: true })).toHaveCount(0);
         expect((await state(guest)).inGame).toBe(false);
+        await expect(guest.locator('.hub-canvas canvas')).toBeVisible();
         await guest.reload();
         await expect(guest.locator('.current-round')).toContainText('Piste publique 2');
         await expect(guest.locator('.participants li')).toHaveCount(5);

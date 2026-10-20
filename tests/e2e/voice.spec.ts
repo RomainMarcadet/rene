@@ -1,5 +1,5 @@
 import { test, expect, type Browser, type Page } from '@playwright/test';
-import { setMicrophoneMode, showPanel, submitDescription, voiceSettings } from './helpers';
+import { setMicrophoneMode, showPanel, submitDescription, voiceSettings, force2DFallback } from './helpers';
 import { livingUI } from './livingRoomFixture';
 
 test.skip(process.env.RENE_VOICE_E2E !== '1', 'Requires the local LiveKit service (RENE_VOICE_E2E=1).');
@@ -201,13 +201,7 @@ test('eliminated players keep receiving audio after the server rotates voice per
       // Keep real WebGL + LiveKit on both audio participants. The three silent
       // voters exercise the supported 2D fallback; this is an audio permission
       // test, while the dedicated hub tests still render four/twelve avatars.
-      await context.addInitScript(() => {
-        const original = HTMLCanvasElement.prototype.getContext;
-        HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, ...args: Parameters<typeof original>) {
-          if (String(args[0]).includes('webgl')) return null;
-          return original.apply(this, args);
-        } as typeof original;
-      });
+      await force2DFallback(context);
       const page = await context.newPage(); pages.push(page);
       await page.goto(pages[0].url()); await page.getByLabel('Pseudonyme').fill(names[i]);
       await page.getByRole('button', { name: 'Rejoindre →', exact: true }).click();
