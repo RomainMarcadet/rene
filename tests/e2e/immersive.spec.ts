@@ -26,11 +26,14 @@ test('TPS prototype: free orbit, camera relative movement, HUD framing and same 
     await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 260, y, { steps: 12 }); await page.mouse.up();
     const turned = await camera(page); expect(turned.position[0]).not.toBeCloseTo(before.position[0], 1); expect(turned.local).toEqual(before.local);
     expect(turned).toMatchObject({ blocked: false });
+    // Read authoritative movement directly. Profiling four software WebGL contexts
+    // during every poll can outlast the assertion even after the player has moved.
+    const position = async () => { const room = await livingState(page); return room.players.find(p => p.id === room.hostId)!.position; };
     await page.keyboard.down('w');
-    try { await expect.poll(async () => { const p = (await camera(page)).local; return Math.hypot(p.x - before.local.x, p.z - before.local.z); }).toBeGreaterThan(.4); }
+    try { await expect.poll(async () => { const p = await position(); return Math.hypot(p.x - before.local.x, p.z - before.local.z); }).toBeGreaterThan(.4); }
     finally { await page.keyboard.up('w'); }
-    await page.getByLabel('Message au salon').focus(); const typing = (await camera(page)).local;
-    await page.keyboard.type('zqsdwasd'); await page.waitForTimeout(150); expect((await camera(page)).local).toEqual(typing);
+    await page.getByLabel('Message au salon').focus(); const typing = await position();
+    await page.keyboard.type('zqsdwasd'); await page.waitForTimeout(150); expect(await position()).toEqual(typing);
     await page.getByRole('button', { name: 'Recentrer la caméra' }).click();
     await page.screenshot({ path: 'output/playwright/v1.4-tps.png' });
     expect(await page.locator('.hub-canvas canvas').evaluate(c => c === (window as unknown as { __livingCanvas: Node }).__livingCanvas)).toBe(true);
