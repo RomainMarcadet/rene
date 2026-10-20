@@ -198,9 +198,20 @@ test('eliminated players keep receiving audio after the server rotates voice per
   try {
     for (let i = 2; i < 5; i++) {
       const context = await browser.newContext({ baseURL, permissions: ['microphone'] }); contexts.push(context);
+      // Keep real WebGL + LiveKit on both audio participants. The three silent
+      // voters exercise the supported 2D fallback; this is an audio permission
+      // test, while the dedicated hub tests still render four/twelve avatars.
+      await context.addInitScript(() => {
+        const original = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, ...args: Parameters<typeof original>) {
+          if (String(args[0]).includes('webgl')) return null;
+          return original.apply(this, args);
+        } as typeof original;
+      });
       const page = await context.newPage(); pages.push(page);
       await page.goto(pages[0].url()); await page.getByLabel('Pseudonyme').fill(names[i]);
       await page.getByRole('button', { name: 'Rejoindre →', exact: true }).click();
+      await expect(page.locator('.scene-fallback')).toBeVisible();
     }
     await Promise.all(pages.map(page => page.getByRole('button', { name: 'Je suis prêt →', exact: true }).click()));
     await pages[0].getByRole('button', { name: /Lancer la partie/ }).click();
