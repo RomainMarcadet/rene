@@ -52,7 +52,7 @@ Autres réductions :
 
 - Le salut et les autres gestes utilisent un trait continu par bras et une main simple, sans coude ni demi-bras articulé : six maillages retirés par avatar.
 - Le serveur ignore les déplacements qui ne changent ni la position ni l’orientation.
-- Le décor statique est mémorisé ; la projection de la caméra change seulement quand le zoom change.
+- Le décor statique est mémorisé ; la projection de la caméra historique changeait seulement quand le zoom changeait ; le salon TPS recalcule la projection aux changements de viewport/HUD.
 - La résolution du rendu 3D est plafonnée à 1,25 sur ordinateur et à 1 en affichage compact. Les textes de l’interface restent des éléments HTML.
 - Le rendu 3D est suspendu lorsque l’onglet est masqué.
 - L’adresse du salon n’est réécrite que lorsque son code change.
@@ -89,7 +89,7 @@ Sources : [mesure V1.5](media/v1.5/metrics.json), [mesure brute actuelle](media/
 
 ## Résultats de validation
 
-`npm run check` réussit sur les sources finales : typage TypeScript, ESLint, **353 tests dans 29 fichiers**, build web, contrôle de séparation de la banque de mots, puis build serveur. Le contrôle du client inspecte huit ressources construites et détecte zéro fuite du catalogue.
+`npm run check` réussit, avant réconciliation avec le salon TPS, sur les sources de la PR initiale : typage TypeScript, ESLint, **353 tests dans 29 fichiers**, build web, contrôle de séparation de la banque de mots, puis build serveur. Le contrôle du client inspecte huit ressources construites et détecte zéro fuite du catalogue.
 
 Les **32 scénarios navigateur distincts** ont réussi au cours de la campagne et des reprises ciblées :
 
@@ -158,3 +158,15 @@ La palette sociale reste non modale et permet de marcher ; la saisie, les vraies
 Les deux rapports V1.4 sont conservés : docs/v1.4.md pour le salon et docs/word-library-v1.4.md pour la bibliothèque. Le contrôle automatisé compare l’empreinte des 1 500 associations reprises et des 120 historiques ; aucune association n’est publiée dans les diagnostics. Le catalogue final compte 1 659 entrées, dont 40 réservées à l’activation adulte explicite. Les contrôles éditoriaux, de confidentialité et de tirage de la PR bibliothèque restent présents, adaptés à la sélection par thèmes.
 
 Les mesures de réduction des appels de dessin ci-dessus décrivent la scène historique utilisée pour la PR initiale ; elles ne constituent pas une mesure avant/après du nouveau salon TPS. La recette de réconciliation est précisée dans la PR avec les résultats des commandes locales et GitHub Actions.
+
+La recette locale a aussi exposé le coût de cinq contextes WebGL simultanés dans le scénario vocal de permissions : délai global atteint pendant la fin du parcours, ou clic retardé par le rendu logiciel. Ce scénario conserve cinq navigateurs réels et toutes ses assertions. Ses deux participants vocaux rendent toujours le hub WebGL et utilisent LiveKit ; les trois votants silencieux passent explicitement par le secours 2D, dont la présence est vérifiée. Les tests dédiés au hub à quatre et douze avatars gardent le rendu complet. Aucun timeout n’est augmenté.
+
+Contrôle de l’intégration : installation et génération Prisma réussies ; typage, lint, 381 tests dans 33 fichiers et builds réussis. Les deux passages du contrôle client examinent neuf ressources et trouvent zéro violation de confidentialité. Les résultats E2E finaux et les reprises restent détaillés dans la PR.
+
+### Audit des échecs CI après réconciliation
+
+La bibliothèque a ensuite validé ses deux workflows sur le commit 28f3b05, puis a été fusionnée dans main. La trace du timeout de descriptions montre un budget global consommé par les préparations et vérifications séquentielles ; leur parallélisation conserve l’ordre des contributions, les 400 ms de retard injectés, toutes les assertions et les délais.
+
+Dans le parcours d’arrivée/reconnexion, la trace CI sur d72111f montre le hub encore en chargement après rechargement lorsque le test attend le Canvas. Les requêtes du module et des dépendances 3D répondent en HTTP 200 ; aucune exception JavaScript ou erreur de création WebGL n’y est enregistrée. Cela ne démontre pas un plantage de Chrome, ni une perte de synchronisation métier. Le même parcours à cinq navigateurs a réussi localement sans retirer ses assertions.
+
+La recette de cycle de vie conserve désormais WebGL sur l’hôte et sur le mobile dont le Canvas est vérifié avant et après rechargement. Les trois observateurs silencieux utilisent explicitement le secours 2D, dont la présence est aussi vérifiée. Il reste cinq navigateurs réels, les mots privés, les indices existants, les votes, Mr. White, la reconnexion et la participation à la partie suivante sont toujours contrôlés. Le test dédié aux quatre hubs WebGL et les scènes à douze avatars restent intacts. Aucun timeout n’est augmenté et le contrôle du Canvas mobile n’est pas remplacé par une acceptation du secours.
