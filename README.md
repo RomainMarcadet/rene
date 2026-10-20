@@ -149,6 +149,16 @@ docker compose --env-file .env.production -f compose.production.yml up --build -
 
 Le fichier d'exemple refuse volontairement de générer une configuration tant que les valeurs d'exemple n'ont pas été remplacées. Le générateur écrit les fichiers contenant les secrets avec des permissions restreintes dans `deploy/generated/` ; ne pas les versionner.
 
+## Catalogue vérifié et tirage persistant
+
+Le serveur expose `GET /health` (statut, SHA de build si injecté, empreinte SHA-256 du catalogue, nombre de paires réellement chargées) et `GET /api/catalogue/status` (nombre de paires, mots distincts, cycle et progression du mélange classique, sans divulguer les associations). Le nombre de mots chargés est calculé par le processus exécuté : il ne se déduit pas de `main`.
+
+Pour renseigner exactement la révision Git dans le conteneur, fournir `RENE_BUILD_SHA` à la compilation Docker (par exemple avec `docker compose build --build-arg RENE_BUILD_SHA="$(git rev-parse HEAD)" app`). L'absence de cette donnée reste indiquée par `unknown`, jamais remplacée par un SHA supposé. Utiliser l'empreinte du catalogue pour comparer deux builds.
+
+Les associations sont réservées de façon atomique en PostgreSQL dans `WordCycle` et `WordDraw`. Le cycle est propre au **pool de mots éligibles** (ensemble de thèmes et difficulté) ; il est commun à toutes les salles utilisant ce même pool, et conservé lors des redémarrages. Un changement de thèmes puis retour à l'ancienne sélection retrouve le cycle de cette sélection. À la première partie suivant l'épuisement, le cycle redémarre sans répéter immédiatement la paire précédente. Deux sélections différentes qui se recoupent conservent des historiques indépendants. Ne pas supprimer le volume PostgreSQL avec `docker compose down -v`.
+
+Le mode « Soirée pop culture » est sélectionné par défaut ; les thèmes historiques restent disponibles via « Tout mélanger ». Le pack 18+ est toujours facultatif et désactivé initialement.
+
 ## Structure et limites de cette version
 
 - `packages/contracts` : types publics, validation des commandes et paramètres.

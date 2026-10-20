@@ -11,6 +11,8 @@ export const WORD_CATEGORY_LABELS: Record<WordCategory, string> = {
   sciences: 'Sciences', adulte: '18+ · Politique & humour noir',
 };
 export const PUBLIC_WORD_CATEGORIES = WORD_CATEGORY_IDS.filter(category => category !== 'adulte');
+/** References likely to be shared in a contemporary social-game night; never includes 18+. */
+export const POP_CULTURE_CATEGORIES = ['cinema', 'jeux-video', 'internet', 'musique', 'television', 'culture', 'sport', 'technologie'] as const satisfies readonly WordCategory[];
 export interface WordSelection {
   category: WordCategory | 'all';
   /** An empty array retains compatibility with the original single-category setting. */

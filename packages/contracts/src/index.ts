@@ -5,7 +5,7 @@ export * from './playerMarks.js';
 export * from './social.js';
 export * from './world.js';
 export * from './wordCategories.js';
-import { WORD_CATEGORY_IDS, WordCategorySchema } from './wordCategories.js';
+import { WORD_CATEGORY_IDS, WordCategorySchema, POP_CULTURE_CATEGORIES } from './wordCategories.js';
 import { AnimationIdSchema, AttackKindSchema, type SocialSnapshot } from './social.js';
 export const SettingsSchema = z.object({
   automaticRoles: z.boolean(), undercoverCount: z.number().int().min(0).max(10), whiteCount: z.number().int().min(0).max(10),
@@ -17,7 +17,7 @@ export const SettingsSchema = z.object({
   adultContent: z.boolean().default(false),
 }).strict();
 export type RoomSettings = z.infer<typeof SettingsSchema>;
-export const DEFAULT_SETTINGS: RoomSettings = { automaticRoles: true, undercoverCount: 1, whiteCount: 1, descriptionSeconds: 45, discussionSeconds: 120, voteSeconds: 30, guessSeconds: 30, roundsPerSession: 5, hostCanSkipDiscussion: true, deadCanSpeak: false, category: 'all', difficulty: 'all', categories: [], adultContent: false };
+export const DEFAULT_SETTINGS: RoomSettings = { automaticRoles: true, undercoverCount: 1, whiteCount: 1, descriptionSeconds: 45, discussionSeconds: 120, voteSeconds: 30, guessSeconds: 30, roundsPerSession: 5, hostCanSkipDiscussion: true, deadCanSpeak: false, category: 'all', difficulty: 'all', categories: [...POP_CULTURE_CATEGORIES], adultContent: false };
 export type Role = 'civilian' | 'undercover' | 'white';
 export type Phase = 'reveal' | 'description' | 'discussion' | 'vote' | 'tiebreak' | 'elimination' | 'whiteGuess' | 'results';
 export type Winner = 'civilians' | 'infiltrators' | 'white';

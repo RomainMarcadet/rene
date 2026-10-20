@@ -10,6 +10,7 @@ import { DEFAULT_APPEARANCE, SOCIAL_COMBAT_CONFIG, isSocialCommand, EnvelopeSche
 import { createPersistence, type Persistence, type Guest } from './persistence.js';
 import { readConfig, type Config } from './config.js';
 import { Rooms, MemoryRoomStore, type Room } from './rooms.js';
+import { WORD_PAIRS, matchingWordPairs, normalizeWordKey } from '@rene/engine';
 import type { WordPair } from '@rene/engine';
 import { SerialQueue, TokenBucket } from './queue.js';
 import { VoiceService } from './voice.js';
@@ -55,7 +56,18 @@ export async function createApp(options: AppOptions = {}) {
     reply.header('Permissions-Policy', 'camera=(), microphone=(self)');
     reply.header('X-Frame-Options', 'DENY');
   });
-  app.get('/health', () => ({ status: 'ok' }));
+  const catalogue = options.wordPairs ?? WORD_PAIRS;
+  const catalogueHash = createHash('sha256').update(JSON.stringify(catalogue)).digest('hex');
+  const buildSha = process.env.RENE_BUILD_SHA || 'unknown';
+  app.get('/health', () => ({ status: 'ok', buildSha, catalogueHash, wordPairCount: catalogue.length }));
+  app.get('/api/catalogue/status', async (_request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const eligible = matchingWordPairs({ category: 'all', categories: [], adultContent: false, difficulty: 'all' }, catalogue);
+    const progress = await persistence.wordPoolProgress(eligible);
+    const distinctWords = new Set(catalogue.flatMap(pair => [normalizeWordKey(pair.a), normalizeWordKey(pair.b)])).size;
+    return { buildSha, catalogueHash, totalPairs: catalogue.length, distinctWords,
+      publicPairs: eligible.length, cycle: progress.cycle, used: progress.used, remaining: progress.total - progress.used };
+  });
   app.get('/api/session', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
     let guest = await authenticate(request.headers.cookie);

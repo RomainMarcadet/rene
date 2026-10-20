@@ -30,11 +30,11 @@ describe('server-only word themes', () => {
   });
 
   it('excludes every adult association from defaults and from all classic-only filters', () => {
-    const defaults = matchingWordPairs(DEFAULT_SETTINGS);
+    const defaults = matchingWordPairs({ ...DEFAULT_SETTINGS, categories: [] });
     expect(defaults).toHaveLength(1619);
     expect(defaults.every(pair => pair.category !== 'adulte')).toBe(true);
     for (const category of PUBLIC_WORD_CATEGORIES) {
-      expect(matchingWordPairs({ ...DEFAULT_SETTINGS, category }).every(pair => pair.category === category)).toBe(true);
+      expect(matchingWordPairs({ ...DEFAULT_SETTINGS, categories: [], category }).every(pair => pair.category === category)).toBe(true);
     }
     expect(matchingWordPairs({ ...DEFAULT_SETTINGS, categories: ['adulte'] })).toEqual([]);
     expect(() => chooseWordPair({ ...DEFAULT_SETTINGS, categories: ['adulte'] }, [])).toThrow('Aucune paire');
