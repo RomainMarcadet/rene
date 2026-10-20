@@ -146,21 +146,25 @@ test('prototype: authoritative punch, fifth impact, fall, recovery and protectio
     const id = (await state(page)).hostId; const target = f.actors[0].id;
     expect(await page.evaluate(async target => {
       const path = '/src/store.ts'; const { send } = await import(path);
-      for (const kind of ['punch', 'slap', 'headbutt', 'shove', 'punch']) { if (!await send({ type: 'player.attack', kind, targetId: target })) return false; await new Promise(resolve => setTimeout(resolve, 820)); }
+      const attacks = ['punch', 'slap', 'headbutt', 'shove', 'punch'] as const;
+      for (const [index, kind] of attacks.entries()) {
+        if (!await send({ type: 'player.attack', kind, targetId: target })) return false;
+        if (index < attacks.length - 1) await new Promise(resolve => setTimeout(resolve, 820));
+      }
       return true;
     }, target)).toBe(true);
     await expect.poll(() => f.actors[0].impacts.size).toBe(5);
     await expect.poll(async () => (await state(page)).social.players[target].physical?.kind).toBe('stun');
     const social = (await state(page)).social.players[target]; expect(social.physical?.kind).toBe('stun');
-    await page.locator('.avatar-label[data-player-id="' + target + '"]').focus();
-    await expect(page.locator('.social-status').filter({ hasText: 'À terre' })).toBeVisible();
-    expect((await send(f.actors[0], { type: 'player.attack', kind: 'punch', targetId: id })).ok).toBe(false);
     await expect.poll(() => page.evaluate(async () => {
       const path = '/node_modules/.vite/deps/@react-three_fiber.js'; const { _roots } = await import(path);
       const state = [..._roots.values()][0].store.getState(); let roll = 0;
       state.scene.traverse((object: { name: string; parent?: { parent?: { parent?: { rotation: { z: number } } } } }) => { if (object.name.startsWith('appearance:potato:buns:')) { let parent = object.parent as unknown as { name: string; rotation: { z: number }; parent?: typeof parent }; while (parent && parent.name !== 'avatar-puppet') parent = parent.parent!; roll = parent?.rotation.z ?? 0; } });
       return roll;
     }), { timeout: 5000 }).toBeLessThan(-.9);
+    await page.locator('.avatar-label[data-player-id="' + target + '"]').focus();
+    await expect(page.locator('.social-status').filter({ hasText: 'À terre' })).toBeVisible();
+    expect((await send(f.actors[0], { type: 'player.attack', kind: 'punch', targetId: id })).ok).toBe(false);
 
     await expect(page.locator('.social-status').filter({ hasText: 'Protégé' })).toBeVisible({ timeout: 5000 });
     expect(await ui(page, { type: 'player.attack', kind: 'punch', targetId: target })).toBe(false);
