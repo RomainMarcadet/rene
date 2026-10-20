@@ -4,6 +4,7 @@ import { DEFAULT_APPEARANCE, EMOTE_DURATION_MS, type Ack, type ClientEvents, typ
 import { createApp } from './app.js';
 import { readConfig } from './config.js';
 import type { Guest, Persistence } from './persistence.js';
+import { TEST_WORD_PAIRS } from '../../../tests/wordFixtures.js';
 
 type Running = Awaited<ReturnType<typeof createApp>>;
 type Client = Socket<ServerEvents, ClientEvents>;
@@ -13,7 +14,7 @@ const apps: Running[] = []; const clients: Client[] = [];
 afterEach(async () => { for (const client of clients.splice(0)) client.disconnect(); for (const running of apps.splice(0)) await running.app.close(); });
 async function server(persistence?: Persistence, useListeningOrigin = false) {
   const config = readConfig({ NODE_ENV: 'test', WEB_ORIGIN: origin });
-  const running = await createApp({ config, logger: false, timers: false, persistence });
+  const running = await createApp({ config, logger: false, timers: false, persistence, wordPairs: TEST_WORD_PAIRS });
   apps.push(running);
   const url = await running.app.listen({ port: 0, host: '127.0.0.1' });
   // The OS assigns the port. Finalize the canonical origin before making requests.
@@ -56,6 +57,41 @@ async function expire(running: Running, room: ReturnType<Running['rooms']['requi
 }
 
 describe('real Socket.IO clients', () => {
+  it('keeps words and editorial metadata private through reveal, descriptions, voting and the White guess', async () => {
+    const { running, url, actors, room } = await opened(5);
+    for (const a of actors) await send(a, { type: 'player.ready', ready: true });
+    expect((await send(actors[0], { type: 'game.start' })).ok).toBe(true);
+    async function confidential() {
+      await expect.poll(() => actors.every(a => a.snapshot?.game?.phaseId === room.game?.phaseId && a.secret?.inGame)).toBe(true);
+      for (const a of actors) {
+        const snapshot = a.snapshot!; const secret = a.secret!;
+        const role = room.game!.roles[a.playerId];
+        const expected = role === 'white' ? null : role === 'civilian' ? room.game!.words.civilian : room.game!.words.undercover;
+        expect(secret.word === expected).toBe(true);
+        expect(Object.keys(secret).sort()).toEqual(['chatReactions', 'inGame', 'playerId', 'voteTarget', 'word']);
+        expect(['words', 'pair', 'pairId', 'category', 'difficulty', 'clueAxes', 'usedWords'].some(key => Object.hasOwn(snapshot.game!, key))).toBe(false);
+        expect(Object.hasOwn(snapshot, 'usedWords')).toBe(false);
+        const serialized = JSON.stringify(snapshot);
+        expect([room.game!.words.civilian, room.game!.words.undercover, 'clueAxes', 'v14-'].some(value => serialized.includes(value))).toBe(false);
+      }
+      const session = await running.app.inject({ method: 'GET', url: '/api/session', headers: { cookie: actors[0].cookie } });
+      expect(['word', 'pair', 'words', 'clueAxes', 'usedWords'].some(key => Object.hasOwn(session.json(), key))).toBe(false);
+    }
+    await confidential(); await expire(running, room, actors[0]); await confidential();
+    while (room.game!.phase === 'description') await send(actors.find(a => a.playerId === room.game!.turnPlayerId)!, { type: 'game.describe', text: 'Indice fictif' }, { phaseId: room.game!.phaseId });
+    await confidential();
+    await send(actors[0], { type: 'game.skipDiscussion' }, { phaseId: room.game!.phaseId }); await confidential();
+    const white = actors.find(a => room.game!.roles[a.playerId] === 'white')!;
+    for (const a of actors) await send(a, { type: 'game.vote', targetId: a === white ? actors.find(other => other !== white)!.playerId : white.playerId }, { phaseId: room.game!.phaseId });
+    expect(room.game!.phase).toBe('whiteGuess'); await confidential();
+    // Reconnection restores the same private word without broadening the public projection.
+    const old = actors[0]; old.socket.disconnect(); actors[0] = await actor(running, url, old);
+    await send(actors[0], { type: 'room.resume' }); await confidential();
+    const currentWhite = actors.find(a => a.playerId === white.playerId)!;
+    expect((await send(currentWhite, { type: 'game.guess', word: room.game!.words.civilian }, { phaseId: room.game!.phaseId })).ok).toBe(true);
+    await expect.poll(() => actors.every(a => a.snapshot?.game?.phase === 'results')).toBe(true);
+    expect(actors.every(a => a.snapshot?.game?.result?.civilWord === room.game!.words.civilian && a.snapshot.game.result.undercoverWord === room.game!.words.undercover)).toBe(true);
+  });
   it('shares role-independent player marks and keeps them with the same appearance and opening seat after reconnect', async () => {
     const { running, url, actors, room } = await opened(8);
     const appearance = { ...DEFAULT_APPEARANCE, hair: 'bun' as const, body: '#F34531' as const };
@@ -123,8 +159,8 @@ describe('real Socket.IO clients', () => {
     for (const a of actors) {
       expect(a.secret).not.toHaveProperty('role');
       expect(a.snapshot?.game).not.toHaveProperty('roles');
-      expect(JSON.stringify(a.snapshot)).not.toContain(room.game!.words.civilian);
-      expect(JSON.stringify(a.snapshot)).not.toContain(room.game!.words.undercover);
+      expect(JSON.stringify(a.snapshot).includes(room.game!.words.civilian)).toBe(false);
+      expect(JSON.stringify(a.snapshot).includes(room.game!.words.undercover)).toBe(false);
     }
     await expire(running, room, actors[0]);
     const stalePhase = room.game!.phaseId;

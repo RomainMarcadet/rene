@@ -61,6 +61,10 @@ La connexion utilise une identité invitée par cookie HttpOnly. PostgreSQL cons
 
 Les descriptions et messages sont bornés et rendus comme texte React. Les commandes sont validées avec Zod côté serveur ; identité, disponibilité, phase, droits d'hôte et éligibilité au vote sont vérifiés indépendamment de l'interface.
 
+## Bibliothèque V1.4
+
+Le catalogue serveur contient 1 620 paires, dont 1 500 ajouts dans quinze catégories. Les données JSON portent des identifiants stables et deux axes éditoriaux privés. Un audit refuse les doublons, inversions, variantes normalisées et métadonnées invalides. Le tirage est uniforme parmi les entrées filtrées hors de la fenêtre récente ; l'historique de salle est borné à 512 identifiants, sans exclusion permanente. Les projections de partie ne portent aucune métadonnée de la paire tirée. Vite bloque les sources serveur et le build client est contrôlé. Les tests navigateur utilisent un catalogue fictif. Voir le [rapport V1.4 sans spoiler](word-library-v1.4.md).
+
 ## Persistance et audio
 
 `Persistence` expose `getGuest`, `saveGuest`, `recordResult` et `close`. L'adaptateur PostgreSQL enregistre une ligne immuable par ID de partie (`ON CONFLICT DO NOTHING`) : les répétitions n'ajoutent pas deux scores. Le JSON du résultat constitue le registre des points ; aucune table de total dénormalisé n'est nécessaire. Les sessions en mémoire sont identifiées par UUID afin que la réutilisation d'un code de salle ne mélange pas l'historique.

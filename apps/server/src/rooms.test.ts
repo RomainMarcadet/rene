@@ -3,12 +3,13 @@ import { CommandSchema, DEFAULT_APPEARANCE, DEFAULT_SETTINGS, EMOTE_DURATION_MS,
 import { createPersistence, type Guest } from './persistence.js';
 import { MemoryRoomStore, Rooms, type Room } from './rooms.js';
 import { SerialQueue } from './queue.js';
+import { TEST_WORD_PAIRS } from '../../../tests/wordFixtures.js';
 
 const initialTime = 100_000;
 const guest = (id: string): Guest => ({ id, tokenHash: `token-${id}`, name: `René ${id}`, appearance: { ...DEFAULT_APPEARANCE }, createdAt: new Date(initialTime) });
 async function fixture(count = 4) {
   const persistence = await createPersistence();
-  const rooms = new Rooms(new MemoryRoomStore(), persistence, 100, () => 0.42);
+  const rooms = new Rooms(new MemoryRoomStore(), persistence, 100, () => 0.42, undefined, TEST_WORD_PAIRS);
   const room = rooms.create(guest('p0'), initialTime);
   for (let n = 1; n < count; n++) rooms.join(room, guest(`p${n}`), initialTime + n);
   return { rooms, room, persistence };
