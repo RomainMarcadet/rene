@@ -1,7 +1,15 @@
 {
-  "name": "rene", "private": true, "version": "0.1.0", "type": "module",
-  "workspaces": ["apps/*", "packages/*"],
-  "engines": {"node": ">=24.0.0"},
+  "name": "rene",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "predev": "npm run db:generate",
     "dev": "concurrently -k -n server,web \"npm run dev -w @rene/server\" \"npm run dev -w @rene/web\"",
@@ -12,17 +20,31 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "check": "npm run typecheck && npm run lint && npm test && npm run build",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build && npm run words:boundary",
     "db:generate": "prisma generate --schema apps/server/prisma/schema.prisma",
-    "db:migrate": "prisma migrate deploy --schema apps/server/prisma/schema.prisma"
+    "db:migrate": "prisma migrate deploy --schema apps/server/prisma/schema.prisma",
+    "words:check": "node --import tsx scripts/check-word-library.ts",
+    "words:boundary": "node --import tsx scripts/check-word-boundary.ts"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1", "@playwright/test": "^1.56.0", "@types/node": "^22.18.0",
-    "concurrently": "^9.2.0", "eslint": "^10.12.0", "globals": "^16.4.0", "prisma": "6.19.3",
-    "tsup": "^8.5.1", "tsx": "^4.20.0", "typescript": "~5.9.3", "typescript-eslint": "^8.71.2", "vite": "^7.3.7", "vitest": "^4.1.11"
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.56.0",
+    "@types/node": "^22.18.0",
+    "concurrently": "^9.2.0",
+    "eslint": "^10.12.0",
+    "globals": "^16.4.0",
+    "prisma": "6.19.3",
+    "tsup": "^8.5.1",
+    "tsx": "^4.20.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.71.2",
+    "vite": "^7.3.7",
+    "vitest": "^4.1.11"
   },
   "overrides": {
-    "@prisma/config@6.19.3": { "deepmerge-ts": "8.0.2" },
+    "@prisma/config@6.19.3": {
+      "deepmerge-ts": "8.0.2"
+    },
     "esbuild": "^0.28.2",
     "vite": "$vite"
   }

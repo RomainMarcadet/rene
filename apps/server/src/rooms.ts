@@ -1,9 +1,9 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import {
-  ANIMATIONS, DEFAULT_SETTINGS, validComposition, canMoveInPhase, voteSeat, SALON_BOUNDS, TABLE_BLOCKER, isSocialCommand, socialMovementAllowed, type AvatarAppearance, type ChatMessage, type ChatReaction,
+  ANIMATIONS, DEFAULT_SETTINGS, validComposition, canMoveInPhase, voteSeat, SALON_BOUNDS, walkable, clearWorldPath, spawnPoint, isSocialCommand, socialMovementAllowed, type AvatarAppearance, type ChatMessage, type ChatReaction,
   type Command, type PublicPlayer, type RoomSettings, type RoomSnapshot, type PrivatePlayerState,
 } from '@rene/contracts';
-import { createGame, applyGameAction, chooseWordPair, recordWordSelection, publicGame, privateGame, type GameState } from '@rene/engine';
+import { createGame, applyGameAction, chooseWordPair, recordWordSelection, WORD_PAIRS, publicGame, privateGame, type GameState, type WordPair } from '@rene/engine';
 import { createSocial, createSocialPlayer, handleSocial, resetSocial, tickSocial, socialSnapshot, cancelSocialReferences, cancelVoluntary, type SocialRuntime, type ServerSocialPlayer } from './social.js';
 import type { Guest, Persistence } from './persistence.js';
 
@@ -24,7 +24,7 @@ const editable = (room: Room) => !room.game || room.game.phase === 'results';
 /** Every transport mutation is queued by player/room before entering this service. */
 export class Rooms {
   readonly playerRooms = new Map<string, string>();
-  constructor(readonly store: RoomStore, private persistence: Persistence, private maxRooms = 100, private random = secureRandom, private onPersistenceError: (error: unknown) => void = () => undefined) {}
+  constructor(readonly store: RoomStore, private persistence: Persistence, private maxRooms = 100, private random = secureRandom, private onPersistenceError: (error: unknown) => void = () => undefined, private wordPairs: readonly WordPair[] = WORD_PAIRS) {}
 
   roomFor(playerId: string) { const code = this.playerRooms.get(playerId); return code ? this.store.get(code) : undefined; }
   requireRoom(playerId: string) { const room = this.roomFor(playerId); if (!room) throw new Error('Rejoins une salle pour continuer.'); return room; }
@@ -49,10 +49,9 @@ export class Rooms {
     if (room.players.has(guest.id)) { this.connected(room, guest.id, now); return; }
     if (room.players.size >= 12) throw new Error('Ce salon accueille déjà 12 personnes.');
     const index = room.players.size;
-    const angle = index * Math.PI * 2 / 12;
     const waiting = !editable(room);
     room.formerPlayers.delete(guest.id);
-    room.players.set(guest.id, { social: createSocialPlayer(), id: guest.id, name: guest.name, appearance: guest.appearance, connected: true, ready: false, position: { x: Math.cos(angle) * 4, z: Math.sin(angle) * 4, yaw: 0 }, alive: !waiting, waiting, score: room.scores.get(guest.id) ?? 0, joinedAt: now, disconnectedAt: null, lastMoveAt: now, lastChatAt: -Infinity, lastEmoteAt: -Infinity });
+    room.players.set(guest.id, { social: createSocialPlayer(), id: guest.id, name: guest.name, appearance: guest.appearance, connected: true, ready: false, position: spawnPoint(index), alive: !waiting, waiting, score: room.scores.get(guest.id) ?? 0, joinedAt: now, disconnectedAt: null, lastMoveAt: now, lastChatAt: -Infinity, lastEmoteAt: -Infinity });
     this.playerRooms.set(guest.id, room.code);
     room.lastOccupiedAt = now;
     // Any roster change cancels readiness; waiting arrivals cannot change an active game.
@@ -107,7 +106,7 @@ export class Rooms {
         this.requireHost(room, id); this.requireLobby(room);
         if (!command.settings.automaticRoles && room.players.size >= 4 && !validComposition(room.players.size, command.settings)) throw new Error('Prévois au moins deux Civils et un Infiltré.');
         // Validate that the word filters have content before accepting them.
-        chooseWordPair(command.settings, [], this.random);
+        chooseWordPair(command.settings, [], this.random, this.wordPairs);
         room.settings = { ...command.settings };
         for (const p of room.players.values()) p.ready = false;
         break;
@@ -117,7 +116,7 @@ export class Rooms {
         const players = [...room.players.values()];
         if (!validComposition(players.length, room.settings)) throw new Error('Il faut de 4 à 12 joueurs et une répartition valide.');
         if (!players.every(p => p.connected && p.ready)) throw new Error('Tout le monde doit être connecté et prêt.');
-        const pair = chooseWordPair(room.settings, room.usedWords, this.random);
+        const pair = chooseWordPair(room.settings, room.usedWords, this.random, this.wordPairs);
         room.game = createGame({ id: randomUUID(), playerIds: players.map(p => p.id), settings: room.settings, pair, now, random: this.random });
         resetSocial(room);
         recordWordSelection(room.usedWords, pair.id);
@@ -239,8 +238,8 @@ export class Rooms {
     const magnitude = Math.max(1, Math.hypot(direction.x, direction.z));
     const x = Math.max(-SALON_BOUNDS.x, Math.min(SALON_BOUNDS.x, player.position.x + direction.x / magnitude * dt * 3.2));
     const z = Math.max(-SALON_BOUNDS.z, Math.min(SALON_BOUNDS.z, player.position.z + direction.z / magnitude * dt * 3.2));
-    // Shared scene table has a 2.6 x 1.6 footprint; keep avatars outside it.
-    if (Math.abs(x) < TABLE_BLOCKER.x && Math.abs(z) < TABLE_BLOCKER.z) return false;
+    // Swept movement and social line of sight share the visible furniture footprints.
+    if (!walkable({ x, z }) || !clearWorldPath(player.position, { x, z })) return false;
     const yaw = direction.x || direction.z ? Math.atan2(direction.x, direction.z) : player.position.yaw;
     if (x === player.position.x && z === player.position.z && yaw === player.position.yaw) return false;
     if ((direction.x || direction.z) && player.social.animation && !ANIMATIONS[player.social.animation.kind].moving) {

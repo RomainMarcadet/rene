@@ -146,3 +146,15 @@ Les pseudos et les indices des captures sont des données de test. Les cartes de
 | [Choix des thèmes sur mobile](media/playability/themes-options-mobile.png) | Sélection multiple et activation explicite du pack 18+ |
 | [Thèmes dans le lobby mobile](media/playability/themes-lobby-mobile.png) | Choix visible avant les boutons de préparation |
 | [Thèmes dans le lobby sur ordinateur](media/playability/themes-lobby-desktop.png) | Résumé partagé et indication 18+ |
+
+## Réconciliation avec la bibliothèque et le salon TPS
+
+La mise à niveau conserve le salon immersif déjà présent sur main : caméra perspective, rotation libre, joystick, collisions partagées, placement de vote, personnalités et animation de la bouche restent actifs. Les optimisations de cette PR sont appliquées à ce salon plutôt qu’au cadrage orthographique historique.
+
+Le cache des poses est lu directement par les avatars, le suivi de caméra, les cadrages collectifs, le recentrage, les regards et les interactions à deux. Le HUD reste indépendant des paquets de mouvement. La projection de caméra est recalculée seulement lorsque le viewport ou la zone dégagée change. Le décor courant est mémoïsé ; le plafond de DPR est combiné à l’adaptation existante. Masquer l’onglet suspend le rendu sans démonter le Canvas ni le vocal.
+
+La palette sociale reste non modale et permet de marcher ; la saisie, les vraies modales et les panneaux de lecture conservent leur protection clavier. Un glissement de caméra ne sélectionne pas un avatar comme un simple clic. Les tests de déplacement utilisent désormais l’orientation TPS.
+
+Les deux rapports V1.4 sont conservés : docs/v1.4.md pour le salon et docs/word-library-v1.4.md pour la bibliothèque. Le contrôle automatisé compare l’empreinte des 1 500 associations reprises et des 120 historiques ; aucune association n’est publiée dans les diagnostics. Le catalogue final compte 1 659 entrées, dont 40 réservées à l’activation adulte explicite. Les contrôles éditoriaux, de confidentialité et de tirage de la PR bibliothèque restent présents, adaptés à la sélection par thèmes.
+
+Les mesures de réduction des appels de dessin ci-dessus décrivent la scène historique utilisée pour la PR initiale ; elles ne constituent pas une mesure avant/après du nouveau salon TPS. La recette de réconciliation est précisée dans la PR avec les résultats des commandes locales et GitHub Actions.

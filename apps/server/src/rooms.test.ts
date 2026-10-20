@@ -3,12 +3,13 @@ import { CommandSchema, DEFAULT_APPEARANCE, DEFAULT_SETTINGS, EMOTE_DURATION_MS,
 import { createPersistence, type Guest } from './persistence.js';
 import { MemoryRoomStore, Rooms, type Room } from './rooms.js';
 import { SerialQueue } from './queue.js';
+import { TEST_WORD_PAIRS } from '../../../tests/wordFixtures.js';
 
 const initialTime = 100_000;
 const guest = (id: string): Guest => ({ id, tokenHash: `token-${id}`, name: `René ${id}`, appearance: { ...DEFAULT_APPEARANCE }, createdAt: new Date(initialTime) });
 async function fixture(count = 4) {
   const persistence = await createPersistence();
-  const rooms = new Rooms(new MemoryRoomStore(), persistence, 100, () => 0.42);
+  const rooms = new Rooms(new MemoryRoomStore(), persistence, 100, () => 0.42, undefined, TEST_WORD_PAIRS);
   const room = rooms.create(guest('p0'), initialTime);
   for (let n = 1; n < count; n++) rooms.join(room, guest(`p${n}`), initialTime + n);
   return { rooms, room, persistence };
@@ -32,6 +33,13 @@ async function eliminate(rooms: Rooms, room: Room, target: string, now: number) 
 }
 
 describe('authoritative room lifecycle', () => {
+  it('rejects movement into the new sofa and lamp without changing the authoritative position', async () => {
+    const { rooms, room } = await fixture(); const p = room.players.get('p0')!;
+    for (const [x, z, dx, dz, time] of [[-2.5, -3.8, -1, 0, 100], [6.2, -2.8, 0, -1, 200]]) {
+      p.position = { x, z, yaw: 0 }; const before = { ...p.position };
+      expect(rooms.move(room, p.id, { x: dx, z: dz }, initialTime + time)).toBe(false); expect(p.position).toEqual(before);
+    }
+  });
   it('requires a connected, ready roster and host authorization', async () => {
     const { rooms, room } = await fixture();
     await expect(rooms.command(room, 'p1', { type: 'game.start' }, initialTime)).rejects.toThrow('hôte');

@@ -3,6 +3,7 @@ import { io, type Socket } from 'socket.io-client';
 import { ANIMATION_IDS, type Ack, type Command, type RoomSnapshot } from '@rene/contracts';
 import { AVATAR_SPECIMENS } from '../../apps/web/src/avatar/specimens';
 import { avatarScene } from './avatarScene';
+import { livingCamera } from './livingRoomFixture';
 import { mkdir, writeFile } from 'node:fs/promises';
 test.use({ viewport: { width: 1586, height: 992 }, video: { mode: 'on', size: { width: 1280, height: 800 } }, launchOptions: { executablePath: process.env.RENE_CHROMIUM_EXECUTABLE_PATH, args: ['--autoplay-policy=no-user-gesture-required'] } });
 test.afterEach(async ({ page }, info) => { const video = page.video(); await page.close(); if (video && info.status === 'passed') { await mkdir('output/playwright', { recursive: true }); await video.saveAs('output/playwright/v1.5-' + (info.title.startsWith('ground target') ? 'ground-availability' : info.title.startsWith('direct avatar') ? 'direct-controls' : info.title.startsWith('motion packets') ? 'motion-performance' : info.title.startsWith('prototype') ? 'combat' : info.title.startsWith('postures') ? 'catalogue' : info.title.startsWith('stunned') ? 'gameplay' : info.title.startsWith('mobile touch') ? 'mobile-controls' : info.title.startsWith('8 ') ? 'eight' : 'twelve') + '.webm'); } });
@@ -91,14 +92,14 @@ test('direct avatar selection and quick keys preserve movement, drafts and conse
     await page.keyboard.press('e');
     await expect(picker.getByRole('heading', { name: 'Avec Lou.' })).toBeVisible();
     const before = (await state(page)).players.find(p => p.id === host)!.position.x;
-    await page.keyboard.down('d');
+    await page.keyboard.down('a');
     await expect.poll(async () => (await state(page)).players.find(p => p.id === host)!.position.x).toBeGreaterThan(before + .3);
-    await page.keyboard.up('d');
+    await page.keyboard.up('a');
     await expect(picker).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(picker).toHaveCount(0);
     await expect(chat).toHaveValue('hjkbefxh');
-  } finally { await page.keyboard.up('d'); await f.close(); }
+  } finally { await page.keyboard.up('a'); await f.close(); }
 });
 
 test('motion packets animate the scene without rerendering gameplay and use one arm stroke per side', async ({ page, playwright, baseURL }, info) => {
@@ -111,11 +112,20 @@ test('motion packets animate the scene without rerendering gameplay and use one 
     });
     const before = await state(page); const initial = before.players.find(p => p.id === actor.id)!.position;
     await moveTo(actor, initial.x + .6, initial.z);
+    const cameraBefore = await livingCamera(page);
+    await page.locator('.hub-canvas canvas').focus();
+    await page.keyboard.down('a');
+    try {
+      await expect.poll(async () => (await livingCamera(page)).local.x).toBeGreaterThan(cameraBefore.local.x + .45);
+    } finally { await page.keyboard.up('a'); }
+    await expect.poll(async () => (await livingCamera(page)).position[0]).toBeGreaterThan(cameraBefore.position[0] + .3);
+    await expect.poll(async () => { const c = await livingCamera(page); return Math.abs(c.screen.x - c.area.left - c.area.width / 2); }).toBeLessThan(4);
+    // Both local TPS follow and remote rendering read live poses without a HUD snapshot.
     const notifications = await page.evaluate(() => (window as unknown as { __gameplayNotifications: number }).__gameplayNotifications);
     expect(notifications).toBe(0);
     await expect.poll(() => page.evaluate(async id => {
       const path = '/node_modules/.vite/deps/@react-three_fiber.js'; const { _roots } = await import(path);
-      return [..._roots.values()][0].store.getState().scene.getObjectByName(`avatar:${id}`)?.position.x;
+      return [..._roots.values()][0].store.getState().scene.getObjectByName(`player:${id}`)?.position.x;
     }, actor.id)).toBeGreaterThan(initial.x + .3);
     const rendered = await page.evaluate(async () => {
       const path = '/node_modules/.vite/deps/@react-three_fiber.js'; const { _roots } = await import(path);

@@ -45,7 +45,7 @@ Ouvrir alors **http://localhost:8080**, sans lancer `npm run dev` en parallèle.
 6. Pendant la discussion, chaque vivant peut confirmer être prêt à voter : l’unanimité ouvre immédiatement le vote ; sinon le chronomètre continue.
 7. Aux résultats, l'hôte retourne au salon pour préparer la partie suivante. Le classement se cumule pendant le nombre de parties configuré, puis une nouvelle session commence.
 
-Déplacements : **ZQSD/WASD**, flèches, ou commandes tactiles. Les déplacements restent libres pendant la partie, sauf pendant le vote et le départage : les vivants rejoignent la table, puis repartent de cette position. Les emotes restent disponibles pour les joueurs autorisés. Pour le vocal, rejoindre le salon puis **maintenir V** ou le bouton tactile pour parler (mode par défaut). Le mode microphone ouvert s’active séparément. **Microphone**, **écoute** et **quitter le vocal** ont chacun leur commande ; le bouton d’un participant coupe seulement son son localement. Une perte de focus, une reconnexion ou un changement de génération vocale coupe la transmission : réactivez-la volontairement.
+Déplacements : **ZQSD/WASD**, flèches, ou joystick tactile, relativement à la caméra. Faites glisser la scène pour regarder autour de vous ; **R / Moi** recentre derrière votre avatar. Deux doigts permettent de marcher et regarder simultanément sur mobile. Les déplacements restent libres pendant la partie, sauf pendant le vote et le départage : les vivants rejoignent la table, puis repartent de cette position. Les emotes restent disponibles pour les joueurs autorisés. Pour le vocal, rejoindre le salon puis **maintenir V** ou le bouton tactile pour parler (mode par défaut). Le mode microphone ouvert s’active séparément. **Microphone**, **écoute** et **quitter le vocal** ont chacun leur commande ; le bouton d’un participant coupe seulement son son localement. Une perte de focus, une reconnexion ou un changement de génération vocale coupe la transmission : réactivez-la volontairement.
 
 Pour tester quatre joueurs sur un même ordinateur, utiliser **quatre profils de navigateur ou contextes privés isolés**. Plusieurs onglets d'un même profil représentent la même identité ; la connexion la plus récente remplace l'ancienne. Un rafraîchissement conserve sa place grâce au cookie invité. Les outils développeur ne peuvent pas modifier les règles, les rôles, les points ou les votes côté serveur.
 
@@ -90,7 +90,8 @@ Les cartes affichent le nom du joueur en grand, puis son indice complet. Sur pet
 
 | Commande | Action |
 | --- | --- |
-| ZQSD, WASD ou flèches | Se déplacer |
+| ZQSD, WASD ou flèches | Se déplacer par rapport à la caméra |
+| Glisser sur la scène / R | Tourner la caméra / recentrer sur soi |
 | H / J / K | Saluer / danser / exprimer un soupçon |
 | E | Choisir un voisin proche |
 | Clic ou toucher sur un avatar ou son nom | Ouvrir ses interactions |
@@ -157,8 +158,12 @@ Le fichier d'exemple refuse volontairement de générer une configuration tant q
 - `deploy` : configuration locale, génération de la configuration HTTPS/TURN de production.
 - `docs` : architecture, roadmap, exploitation et recette.
 
+La V1.4 ajoute **1 500 paires**, pour **1 620 au total**, dans quinze catégories. Le catalogue reste côté serveur ; les tests navigateur utilisent des données fictives pour préserver la découverte. `npm run words:check` affiche uniquement les statistiques et contrôles, et `npm run words:boundary` vérifie les ressources frontend après le build. Voir le [rapport V1.4 sans spoiler](docs/word-library-v1.4.md) pour les distributions, le tirage, la méthode éditoriale et les validations.
+
 Les salles et les parties actives résident en mémoire dans **une seule instance applicative**. Un redémarrage termine ces salles ; PostgreSQL conserve les profils invités et les résultats déjà enregistrés, mais ne permet pas de reprendre une partie interrompue. Le classement affiché appartient à la session en cours. Les résultats archivés ne disposent pas encore d'un écran de consultation.
 
 Supprimer les cookies fait perdre l'identité invitée et l'accès à sa place ; aucun mécanisme de récupération de compte n'est proposé. Les salons sans personne connectée expirent après 30 minutes. Le vocal auto-hébergé et le repli TURN doivent être validés sur les réseaux réels de la recette avant diffusion publique. La présence de la configuration Docker ne constitue pas à elle seule une validation de déploiement.
 
 Voir [architecture](docs/architecture.md) et [roadmap](docs/roadmap.md) pour les décisions et les étapes restantes.
+
+Le salon immersif « Chez René » conserve le HUD, le vocal et le catalogue social V1.5. Quatre allures se choisissent dans l’éditeur. Voir [la caméra TPS, les collisions, les captures et la recette](docs/v1.4.md).

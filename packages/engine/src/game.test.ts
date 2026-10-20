@@ -329,13 +329,14 @@ describe('banque française', () => {
       }
     }
   });
-  it('ne répète aucune paire avant épuisement, y compris dans les cycles suivants', () => {
+  it('exclut les choix récents sans empêcher la réutilisation ultérieure', () => {
     const settings = { category: 'nature', difficulty: 'hard' } as const;
     const count = WORD_PAIRS.filter(pair => pair.category === 'nature' && pair.difficulty === 'hard').length;
     const history: string[] = [];
     for (let i = 0; i < count * 3; i++) history.push(chooseWordPair(settings, history, random).id);
-    for (let i = 0; i < 3; i++) expect(new Set(history.slice(i * count, (i + 1) * count)).size).toBe(count);
-    expect(history[count]).not.toBe(history[count - 1]);
+    const windowSize = Math.min(512, Math.floor(count / 2));
+    for (let i = 0; i < history.length; i++) expect(history.slice(Math.max(0, i - windowSize), i).includes(history[i])).toBe(false);
+    expect(new Set(history).size).toBeLessThan(history.length);
   });
 });
 

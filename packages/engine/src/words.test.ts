@@ -16,7 +16,7 @@ describe('server-only word themes', () => {
     expect(WORD_PAIRS).toHaveLength(1659);
     expect(WORD_PAIRS.filter(pair => pair.category === 'adulte')).toHaveLength(40);
     expect(auditWordLibrary(WORD_PAIRS)).toEqual([]);
-    for (const pair of LEGACY_WORD_PAIRS) expect(WORD_PAIRS.find(item => item.id === pair.id)).toEqual(pair);
+    for (const pair of LEGACY_WORD_PAIRS) expect(JSON.stringify(WORD_PAIRS.find(item => item.id === pair.id)) === JSON.stringify(pair), pair.id).toBe(true);
   });
 
   it('provides every theme at every difficulty with adult inclusion always explicit', () => {

@@ -347,3 +347,15 @@
 .layout-mobile .drawer-tabs .drawer-social { display: block; flex: 0 0 44px; font-size: 22px; }
 
 .drawer-tabs .drawer-social[data-invite=true] { background: var(--yellow); }
+
+.hub-canvas { touch-action: none; }
+.camera-controls { position: absolute; z-index: 12; display: flex; gap: 5px; }
+.camera-controls button { display: flex; align-items: center; gap: 4px; min-width: 38px; min-height: 36px; padding: 5px 8px; border: 2px solid var(--ink); border-radius: 6px; background: var(--cream); font-weight: 800; }
+.camera-controls button[aria-pressed=true] { background: var(--yellow); }
+.camera-controls span { font-size: 9px; }
+.joystick { display: none; position: absolute; z-index: 12; width: 92px; height: 92px; left: max(14px, env(safe-area-inset-left)); bottom: 190px; border: 2px solid var(--ink); border-radius: 50%; background: #f5f2eacc; touch-action: none; align-items: center; justify-content: center; }
+.joystick span { display: grid; place-items: center; width: 40px; height: 40px; border: 2px solid var(--ink); border-radius: 50%; background: var(--yellow); font-size: 24px; pointer-events: none; }
+@media (pointer: coarse) { .joystick { display: flex; } }
+@media (max-height: 600px) { .joystick { width: 72px; height: 72px; bottom: 155px; } }
+
+@media (pointer: coarse) { .camera-controls button { min-height: 44px; min-width: 44px; } }

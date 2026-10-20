@@ -3,6 +3,7 @@ import { AppearanceSchema, type AvatarAppearance } from './appearance.js';
 export * from './appearance.js';
 export * from './playerMarks.js';
 export * from './social.js';
+export * from './world.js';
 export * from './wordCategories.js';
 import { WORD_CATEGORY_IDS, WordCategorySchema } from './wordCategories.js';
 import { AnimationIdSchema, AttackKindSchema, type SocialSnapshot } from './social.js';

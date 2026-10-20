@@ -61,6 +61,10 @@ La connexion utilise une identité invitée par cookie HttpOnly. PostgreSQL cons
 
 Les descriptions et messages sont bornés et rendus comme texte React. Les commandes sont validées avec Zod côté serveur ; identité, disponibilité, phase, droits d'hôte et éligibilité au vote sont vérifiés indépendamment de l'interface.
 
+## Bibliothèque V1.4
+
+Le catalogue serveur contient 1 620 paires, dont 1 500 ajouts dans quinze catégories. Les données JSON portent des identifiants stables et deux axes éditoriaux privés. Un audit refuse les doublons, inversions, variantes normalisées et métadonnées invalides. Le tirage est uniforme parmi les entrées filtrées hors de la fenêtre récente ; l'historique de salle est borné à 512 identifiants, sans exclusion permanente. Les projections de partie ne portent aucune métadonnée de la paire tirée. Vite bloque les sources serveur et le build client est contrôlé. Les tests navigateur utilisent un catalogue fictif. Voir le [rapport V1.4 sans spoiler](word-library-v1.4.md).
+
 ## Persistance et audio
 
 `Persistence` expose `getGuest`, `saveGuest`, `recordResult` et `close`. L'adaptateur PostgreSQL enregistre une ligne immuable par ID de partie (`ON CONFLICT DO NOTHING`) : les répétitions n'ajoutent pas deux scores. Le JSON du résultat constitue le registre des points ; aucune table de total dénormalisé n'est nécessaire. Les sessions en mémoire sont identifiées par UUID afin que la réutilisation d'un code de salle ne mélange pas l'historique.
@@ -90,3 +94,12 @@ La présentation du tour et des éliminés dérive uniquement de `RoomSnapshot`.
 La décision de `guess` utilise `isAcceptableWhiteGuess`, dans le moteur exclusivement. Normalisation Unicode, formes grammaticales éditoriales et fautes explicites sont acceptées ; les autres cas ne sont pas déduits d’une distance de caractères. Aucun service externe, dictionnaire complet ou LLM. Le serveur conserve son unique tentative et ses scores. `RoleReveal` réutilise seulement le rôle public d’un éliminé pendant élimination/devinette, et les cartes conservent ce rôle jusqu’au rejeu.
 
 Voir [le rapport V1.2](v1.2.md) pour les cas limites, les tests et la politique d’extension du validateur. L’infrastructure et le port HTTP 8080 sont inchangés.
+
+
+## Salon immersif — The Living Room
+
+Le hub utilise une caméra perspective locale. `scene/camera/CameraDirector` suit les clés publiques de partie/phase/cible et `findClearArea`, sans événement caméra ni transformation autoritaire du joueur. Les entrées clavier et tactiles partagent `cameraRelative` ; leurs directions restent validées par le serveur.
+
+`packages/contracts/src/world.ts` est la source des empreintes du mobilier, des murs et des apparitions. Les déplacements utilisent une vérification de segment et de destination ; les interactions sociales partagent la même ligne de vue. `voteSeat` et les règles du moteur restent inchangés. Les composants `scene/world` rendent ces volumes en mobilier procédural original. La caméra se rétracte contre le mobilier ; les murs côté caméra s’effacent progressivement.
+
+La personnalité est un champ compatible de l’apparence (défaut historique impassible). La couche `poses/personality` ne modifie que des poses secondaires locales. Le vocal fournit uniquement son signal public d’activité ; aucune analyse ni nouvelle connexion. Voir [le rapport Living Room](v1.4.md).
