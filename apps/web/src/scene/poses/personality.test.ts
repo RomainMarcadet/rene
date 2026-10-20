@@ -34,4 +34,10 @@ describe('public cosmetic personality layer', () => {
       expect(face.blink).toBeGreaterThanOrEqual(.09); expect(face.talk).toBe(0);
     }
   });
+  it('preserves the voluntary suspicion head turn while a neighbouring speaker attracts attention', () => {
+    const p = avatarPose({ time: 1, now: 2000, moving: false, reduced: false, emote: 'suspect', until: 3500 });
+    const turn = p.headY; const face = { blink: 1, talk: 0, look: 0 };
+    personalityPose(p, 1, 'nervous', 2, false, true, .45, face);
+    expect(p.headY).toBe(turn); expect(face.talk).toBeGreaterThan(0);
+  });
 });

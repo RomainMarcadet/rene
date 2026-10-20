@@ -27,7 +27,8 @@ export function personalityPose(p: Pose, time: number, personality: Personality,
       p.roll += Math.sin(time * rate / 2) * (personality === 'relaxed' ? .075 : .025);
     }
   }
-  p.headY += Math.max(-.45, Math.min(.45, gaze));
+  // Suspicion already owns the head turn. Voice can animate the mouth without steering that pose.
+  if (p.state !== 'suspect') p.headY += Math.max(-.45, Math.min(.45, gaze));
 }
 export function speakerGaze(player: PublicPlayer, players: PublicPlayer[], speaking: string[]) {
   let best: PublicPlayer | undefined; let distance = 36;
