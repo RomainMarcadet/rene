@@ -8,7 +8,7 @@ describe('word theme settings', () => {
     expect(restored.categories).toEqual([]);
     expect(restored.adultContent).toBe(false);
     expect(selectedWordCategories(restored)).toEqual(['nature']);
-    expect(selectedWordCategories(DEFAULT_SETTINGS)).toEqual(PUBLIC_WORD_CATEGORIES);
+    expect(selectedWordCategories(DEFAULT_SETTINGS)).toEqual([...DEFAULT_SETTINGS.categories]);
   });
 
   it('prioritizes the selected themes over the old single category', () => {
