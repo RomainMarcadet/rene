@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createPersistence } from './persistence.js';
 import type { WordPair } from '@rene/engine';
-const pool: WordPair[] = [
+const fixtures: WordPair[] = [
   { id: 'db-first', a: 'Alpha', b: 'Beta', category: 'culture', difficulty: 'easy' },
   { id: 'db-second', a: 'Gamma', b: 'Delta', category: 'culture', difficulty: 'easy' },
   { id: 'db-third', a: 'Epsilon', b: 'Zeta', category: 'culture', difficulty: 'easy' },
@@ -9,6 +9,8 @@ const pool: WordPair[] = [
 describe('persistent word cycles', () => {
   it('does not repeat before complete exhaustion and preserves history after reconnection', async () => {
     const prefix = 'words-db-test-' + crypto.randomUUID();
+    // Unique, spoiler-free IDs isolate cycles between separate test runs.
+    const pool = fixtures.map(pair => ({ ...pair, id: prefix + '-' + pair.id }));
     const store = await createPersistence(process.env.DATABASE_URL);
     try {
       const ids = await Promise.all(pool.map((_, i) => store.reserveWordPair(prefix + '-' + i, pool, () => 0)));
