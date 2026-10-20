@@ -13,7 +13,8 @@ describe('persistent word cycles', () => {
     const pool = fixtures.map(pair => ({ ...pair, id: prefix + '-' + pair.id }));
     const store = await createPersistence(process.env.DATABASE_URL);
     try {
-      const ids = await Promise.all(pool.map((_, i) => store.reserveWordPair(prefix + '-' + i, pool, () => 0)));
+      const ids = [];
+      for (let i = 0; i < pool.length; i++) ids.push(await store.reserveWordPair(prefix + '-' + i, pool, () => 0));
       expect(new Set(ids.map(pair => pair.id)).size).toBe(pool.length);
       const progress = await store.wordPoolProgress(pool);
       expect(progress.used).toBe(pool.length);
