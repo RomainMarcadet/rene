@@ -43,7 +43,7 @@ describe('room theme enforcement', () => {
 
   it('preserves the expanded catalogue history through the final unseen selection', async () => {
     const { rooms, room } = await fixture();
-    const eligible = matchingWordPairs(DEFAULT_SETTINGS).map(pair => pair.id);
+    const eligible = matchingWordPairs({ ...DEFAULT_SETTINGS, categories: [] }).map(pair => pair.id);
     expect(eligible.length).toBeGreaterThan(1000);
     // Represents previous selections in this room, beyond the former 1,000-ID limit.
     room.usedWords = eligible.slice(0, -1);
