@@ -187,9 +187,9 @@ describe('authoritative room lifecycle', () => {
     const { rooms, room } = await fixture();
     for (const [i, kind] of (['wave', 'suspect', 'dance'] as const).entries()) {
       const now = initialTime + i * (EMOTE_DURATION_MS + 1);
-      await rooms.command(room, 'p0', { type: 'player.emote', kind }, now);
+      await rooms.command(room, 'p0', { type: 'player.emote', kind }, now, room.social.generation);
       expect(rooms.snapshot(room, now).players[0].emote).toEqual({ kind, until: now + emoteDuration(kind) });
-      await expect(rooms.command(room, 'p0', { type: 'player.emote', kind }, now + 1)).rejects.toThrow('souffle');
+      await expect(rooms.command(room, 'p0', { type: 'player.emote', kind }, now + 1, room.social.generation)).rejects.toThrow('souffle');
       expect(rooms.snapshot(room, now + EMOTE_DURATION_MS).players[0].emote).toBeUndefined();
     }
   });

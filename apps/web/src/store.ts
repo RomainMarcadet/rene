@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { reuseAppearances } from './snapshots';
 import { commandId } from './commandId';
 import { io, type Socket } from 'socket.io-client';
 import { AppearanceSchema, DEFAULT_APPEARANCE, type AvatarAppearance, type ClientEvents, type Command, type PrivatePlayerState, type RoomSnapshot, type ServerEvents } from '@rene/contracts';
@@ -88,7 +89,7 @@ export function initialize() {
       });
       socket.on('snapshot', room => {
         const previous = useGame.getState().room;
-        useGame.setState({ room, offset: room.serverNow - Date.now(), ...(previous?.game?.id !== room.game?.id ? { secret: null } : {}) });
+        useGame.setState({ room: { ...room, players: reuseAppearances(room.players, previous?.players) }, offset: room.serverNow - Date.now(), ...(previous?.game?.id !== room.game?.id ? { secret: null } : {}) });
         const url = new URL(location.href); url.searchParams.set('room', room.code); history.replaceState(null, '', url);
       });
       socket.on('private', secret => useGame.setState({ secret }));
@@ -104,7 +105,7 @@ export function send(command: Command, quiet = false): Promise<boolean> {
   const current = useGame.getState();
   if (!socket?.connected) { if (!quiet) notify('Connexion interrompue. Votre place vous attend : reconnexion en cours…'); return Promise.resolve(false); }
   return new Promise(resolve => {
-    socket!.timeout(7000).emit('command', { id: commandId(), command, ...(current.room?.game ? { phaseId: current.room.game.phaseId } : {}) }, (error, result) => {
+    socket!.timeout(7000).emit('command', { id: commandId(), command, ...(current.room ? { socialGeneration: current.room.social.generation } : {}), ...(current.room?.game ? { phaseId: current.room.game.phaseId } : {}) }, (error, result) => {
       if (error || !result?.ok) { if (!quiet) notify(error ? 'Pas de réponse du salon. Vérifiez la connexion avant de réessayer.' : (result && !result.ok ? result.error : 'Action refusée.')); resolve(false); return; }
       if (command.type === 'room.leave' || (command.type === 'room.resume' && !result.code && Boolean(current.room || current.session?.roomCode))) {
         if (command.type === 'room.resume') notify('Ce salon a fermé. Créez-en un nouveau pour retrouver vos amis.');

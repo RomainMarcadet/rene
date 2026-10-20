@@ -174,7 +174,7 @@
 .layout-intermediate .suspects-zone, .layout-intermediate .clues-zone { grid-area: 1 / 1 / 3 / 3; width: min(440px, 100%); max-height: min(440px, 100%); align-self: end; justify-self: start; }
 .layout-intermediate .clues-zone { width: 100%; max-height: none; }
 .layout-intermediate .drawer-tabs { display: flex; position: absolute; bottom: -52px; left: 0; gap: 6px; }
-.layout-intermediate .drawer-tabs button:last-child { display: none; }
+.layout-intermediate .drawer-tabs button[aria-controls="room-discussion"] { display: none; }
 .room-page .drawer-tabs button { background: var(--cream); border: var(--line); border-radius: 7px; padding: 10px 12px; min-height: 42px; font-size: 11px; font-weight: 800; }
 .room-page .drawer-tabs button[aria-expanded=true] { background: var(--yellow); }
 .room-page .drawer-tabs button>span { margin-left: 8px; }
@@ -317,3 +317,25 @@
   .layout-mobile.clues-open.in-game .gameplay-zone { grid-area: 2 / 1; width: 100%; max-height: 120px; align-self: end; }
   .layout-mobile.clues-open.in-game .voice-panel { grid-area: 2 / 2; align-self: end; }
 }
+
+/* V1.5: a compact launcher, never another permanent HUD panel. */
+.room-page .social-controls { max-width: calc(100vw - 24px); }
+.room-page .social-controls .social-favorites { display: flex; gap: 3px; }
+.room-page .social-controls button { min-width: 36px; }
+.room-page .social-controls>small { display: block; font-size: 9px; max-width: 220px; }
+.social-status { display: block; font-size: 9px; padding: 2px; background: var(--yellow); color: var(--ink); border-radius: 3px; }
+.social-tabs { display: flex; flex-wrap: wrap; gap: 5px; margin: 16px 0; }
+.social-tabs button, .social-catalog button { min-height: 44px; padding: 8px 10px; border: var(--line); border-radius: 6px; background: var(--cream); font: inherit; font-size: 12px; font-weight: 700; }
+.social-tabs button[aria-pressed=true] { background: var(--yellow); }
+.social-catalog { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.social-preference { display: flex; gap: 10px; align-items: center; margin: 16px 0; font-size: 13px; }
+.social-preference input { width: 22px; height: 22px; }
+.social-invitation { padding: 10px; border: var(--line); border-radius: 7px; background: var(--yellow); }
+.social-invitation .button { margin: 4px; }
+.room-page .social-controls .social-invite { width: auto; height: auto; border-radius: 6px; font-size: 11px; min-height: 44px; padding: 6px; background: var(--yellow); }
+.layout-mobile .social-controls .social-favorites button { width: 44px; height: 44px; }
+.layout-mobile .social-controls .social-favorites button[aria-label="Emote Danse"], .layout-mobile .social-controls .social-favorites button[aria-label="Emote Soupçon"] { display: none; }
+.room-page .drawer-tabs .drawer-social { display: none; }
+.layout-mobile .drawer-tabs .drawer-social { display: block; flex: 0 0 44px; font-size: 22px; }
+
+.drawer-tabs .drawer-social[data-invite=true] { background: var(--yellow); }
