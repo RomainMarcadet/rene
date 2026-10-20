@@ -1,75 +1,58 @@
-import type { RoomSettings } from '@rene/contracts';
+import { selectedWordCategories, type RoomSettings, type WordSelection } from '@rene/contracts';
+import type { WordPair } from './wordTypes.js';
+import { LEGACY_WORD_PAIRS } from './legacyWords.js';
+import { auditWordLibrary } from './wordAudit.js';
+import pack0 from './word-data/quotidien.json';
+import pack1 from './word-data/nature.json';
+import pack2 from './word-data/cuisine.json';
+import pack3 from './word-data/culture.json';
+import pack4 from './word-data/voyage.json';
+import pack5 from './word-data/cinema.json';
+import pack6 from './word-data/jeux-video.json';
+import pack7 from './word-data/internet.json';
+import pack8 from './word-data/musique.json';
+import pack9 from './word-data/sport.json';
+import pack10 from './word-data/politique.json';
+import pack11 from './word-data/television.json';
+import pack12 from './word-data/technologie.json';
+import pack13 from './word-data/histoire.json';
+import pack14 from './word-data/sciences.json';
+import adultPack from './word-data/adulte.json';
+export type { WordPair } from './wordTypes.js';
+export { LEGACY_WORD_PAIRS } from './legacyWords.js';
+export { auditWordLibrary, libraryStatistics, normalizeWordKey, pairKey } from './wordAudit.js';
 
-export interface WordPair {
-  id: string;
-  a: string;
-  b: string;
-  category: Exclude<RoomSettings['category'], 'all'>;
-  difficulty: Exclude<RoomSettings['difficulty'], 'all'>;
+const packs = [pack0, pack1, pack2, pack3, pack4, pack5, pack6, pack7, pack8, pack9, pack10, pack11, pack12, pack13, pack14, adultPack];
+export const NEW_WORD_PAIRS: readonly WordPair[] = Object.freeze(packs.flatMap(pack =>
+  pack.pairs.map(pair => Object.freeze({ ...pair, category: pack.category as WordPair['category'], difficulty: pair.difficulty as WordPair['difficulty'], clueAxes: Object.freeze([...pair.clueAxes]) })),
+));
+export const WORD_PAIRS: readonly WordPair[] = Object.freeze([
+  ...LEGACY_WORD_PAIRS.map(pair => Object.freeze(pair)), ...NEW_WORD_PAIRS,
+]);
+const issues = auditWordLibrary(WORD_PAIRS);
+if (issues.length) throw new Error('Catalogue invalide : ' + issues.map(issue => issue.id + ':' + issue.code).join(', '));
+
+/** Keep more than one full catalogue cycle without an unbounded room history. */
+export const WORD_HISTORY_LIMIT = WORD_PAIRS.length * 2;
+export function recordWordSelection(history: string[], id: string): void {
+  history.push(id);
+  if (history.length > WORD_HISTORY_LIMIT) history.splice(0, history.length - WORD_HISTORY_LIMIT);
 }
 
-type Entry = readonly [string, string, WordPair['difficulty']];
-const groups: Record<WordPair['category'], readonly Entry[]> = {
-  quotidien: [
-    ['Chaise', 'Tabouret', 'easy'], ['Canapé', 'Fauteuil', 'easy'], ['Douche', 'Baignoire', 'easy'],
-    ['Balai', 'Aspirateur', 'easy'], ['Savon', 'Shampooing', 'easy'], ['Fourchette', 'Cuillère', 'easy'],
-    ['Chemise', 'T-shirt', 'easy'], ['Bottes', 'Baskets', 'easy'], ['Lunettes', 'Lentilles', 'easy'],
-    ['Montre', 'Horloge', 'easy'], ['Téléphone', 'Tablette', 'easy'], ['Clé', 'Cadenas', 'easy'],
-    ['Oreiller', 'Coussin', 'medium'], ['Rideau', 'Store', 'medium'], ['Vase', 'Pot', 'medium'],
-    ['Parfum', 'Déodorant', 'medium'], ['Cahier', 'Carnet', 'medium'], ['Clavier', 'Piano', 'medium'],
-    ['Crayon', 'Stylo', 'medium'], ['Ascenseur', 'Escalator', 'medium'], ['Médecin', 'Infirmier', 'medium'],
-    ['Prison', 'École', 'hard'], ['Réunion', 'Entretien', 'hard'], ['Facture', 'Ticket de caisse', 'hard'],
-  ],
-  nature: [
-    ['Chat', 'Chien', 'easy'], ['Mer', 'Océan', 'easy'], ['Lac', 'Étang', 'easy'],
-    ['Rivière', 'Fleuve', 'easy'], ['Lion', 'Tigre', 'easy'], ['Lapin', 'Lièvre', 'easy'],
-    ['Poule', 'Canard', 'easy'], ['Abeille', 'Guêpe', 'easy'], ['Papillon', 'Libellule', 'easy'],
-    ['Montagne', 'Colline', 'easy'], ['Pluie', 'Neige', 'easy'], ['Soleil', 'Lune', 'easy'],
-    ['Forêt', 'Jungle', 'medium'], ['Désert', 'Savane', 'medium'], ['Requin', 'Dauphin', 'medium'],
-    ['Grenouille', 'Crapaud', 'medium'], ['Hibou', 'Chouette', 'medium'], ['Corbeau', 'Pie', 'medium'],
-    ['Rose', 'Tulipe', 'medium'], ['Chêne', 'Érable', 'medium'], ['Lave', 'Magma', 'hard'],
-    ['Brume', 'Brouillard', 'hard'], ['Galets', 'Graviers', 'hard'], ['Mousse', 'Lichen', 'hard'],
-  ],
-  cuisine: [
-    ['Café', 'Thé', 'easy'], ['Pizza', 'Burger', 'easy'], ['Pain', 'Brioche', 'easy'],
-    ['Croissant', 'Pain au chocolat', 'easy'], ['Pomme', 'Poire', 'easy'], ['Orange', 'Clémentine', 'easy'],
-    ['Pêche', 'Abricot', 'easy'], ['Confiture', 'Miel', 'easy'], ['Crêpe', 'Gaufre', 'easy'],
-    ['Glace', 'Sorbet', 'easy'], ['Soupe', 'Purée', 'easy'], ['Riz', 'Pâtes', 'easy'],
-    ['Beurre', 'Margarine', 'medium'], ['Lait', 'Crème', 'medium'], ['Yaourt', 'Fromage blanc', 'medium'],
-    ['Sushi', 'Maki', 'medium'], ['Quiche', 'Tarte', 'medium'], ['Raclette', 'Fondue', 'medium'],
-    ['Ketchup', 'Moutarde', 'medium'], ['Courgette', 'Concombre', 'medium'], ['Persil', 'Coriandre', 'hard'],
-    ['Cannelle', 'Muscade', 'hard'], ['Macaron', 'Meringue', 'hard'], ['Praline', 'Nougat', 'hard'],
-  ],
-  culture: [
-    ['Cinéma', 'Théâtre', 'easy'], ['Roman', 'Bande dessinée', 'easy'], ['Guitare', 'Violon', 'easy'],
-    ['Batterie', 'Tambour', 'easy'], ['Chant', 'Danse', 'easy'], ['Football', 'Rugby', 'easy'],
-    ['Tennis', 'Badminton', 'easy'], ['Échecs', 'Dames', 'easy'], ['Puzzle', 'Lego', 'easy'],
-    ['Magicien', 'Clown', 'easy'], ['Super-héros', 'Chevalier', 'easy'], ['Pirate', 'Cow-boy', 'easy'],
-    ['Netflix', 'YouTube', 'medium'], ['Musée', 'Galerie', 'medium'], ['Concert', 'Festival', 'medium'],
-    ['Peinture', 'Dessin', 'medium'], ['Photographie', 'Portrait', 'medium'], ['Journal', 'Magazine', 'medium'],
-    ['Radio', 'Podcast', 'medium'], ['Opéra', 'Comédie musicale', 'medium'], ['Satire', 'Parodie', 'hard'],
-    ['Fable', 'Conte', 'hard'], ['Mythe', 'Légende', 'hard'], ['Sculpture', 'Statue', 'hard'],
-  ],
-  voyage: [
-    ['Avion', 'Hélicoptère', 'easy'], ['Train', 'Métro', 'easy'], ['Bus', 'Tramway', 'easy'],
-    ['Vélo', 'Trottinette', 'easy'], ['Bateau', 'Sous-marin', 'easy'], ['Voiture', 'Moto', 'easy'],
-    ['Taxi', 'Ambulance', 'easy'], ['Valise', 'Sac à dos', 'easy'], ['Hôtel', 'Camping', 'easy'],
-    ['Plage', 'Piscine', 'easy'], ['Tente', 'Caravane', 'easy'], ['Château', 'Palais', 'easy'],
-    ['Passeport', 'Carte d’identité', 'medium'], ['Carte', 'Boussole', 'medium'], ['Phare', 'Tour', 'medium'],
-    ['Pont', 'Tunnel', 'medium'], ['Port', 'Gare', 'medium'], ['Île', 'Presqu’île', 'medium'],
-    ['Safari', 'Randonnée', 'medium'], ['Parc', 'Jardin', 'medium'], ['Auberge', 'Gîte', 'hard'],
-    ['Croisière', 'Traversée', 'hard'], ['Escale', 'Correspondance', 'hard'], ['Visa', 'Billet', 'hard'],
-  ],
-};
+/** The public theme metadata never contains a word or an editorial association. */
+export function matchingWordPairs(settings: WordSelection & Pick<RoomSettings, 'difficulty'>, catalogue: readonly WordPair[] = WORD_PAIRS): WordPair[] {
+  const categories = new Set(selectedWordCategories(settings));
+  return catalogue.filter(pair => categories.has(pair.category) && (settings.difficulty === 'all' || pair.difficulty === settings.difficulty));
+}
 
-/** These 120 original editorial pairs are bundled exclusively into the server. */
-export const WORD_PAIRS: readonly WordPair[] = Object.entries(groups).flatMap(([category, entries]) =>
-  entries.map(([a, b, difficulty], index) => ({ id: `${category}-${String(index + 1).padStart(2, '0')}`, a, b, category: category as WordPair['category'], difficulty })),
-);
-
-/** Pass the chronological selection history to avoid repetition in every cycle. */
-export function chooseWordPair(settings: Pick<RoomSettings, 'category' | 'difficulty'>, usedIds: Iterable<string>, random: () => number = Math.random): WordPair {
-  const pool = WORD_PAIRS.filter(pair => (settings.category === 'all' || pair.category === settings.category) && (settings.difficulty === 'all' || pair.difficulty === settings.difficulty));
+/** Uniform selection from the chosen themes, retaining the existing no-repeat cycles. */
+export function chooseWordPair(
+  settings: WordSelection & Pick<RoomSettings, 'difficulty'>,
+  usedIds: Iterable<string>,
+  random: () => number = Math.random,
+  catalogue: readonly WordPair[] = WORD_PAIRS,
+): WordPair {
+  const pool = matchingWordPairs(settings, catalogue);
   if (!pool.length) throw new Error('Aucune paire ne correspond à ces filtres.');
   const eligible = new Set(pool.map(pair => pair.id));
   const used = new Set<string>();

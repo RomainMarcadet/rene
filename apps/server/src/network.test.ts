@@ -56,6 +56,69 @@ async function expire(running: Running, room: ReturnType<Running['rooms']['requi
 }
 
 describe('real Socket.IO clients', () => {
+  it('restores old clues on arrival and reconnect, then includes the waiting guest in the next game', async () => {
+    const { running, url, actors, room, code } = await opened();
+    const describing = () => room.game?.phase === 'description';
+    for (const a of actors) expect((await send(a, { type: 'player.ready', ready: true })).ok).toBe(true);
+    expect((await send(actors[0], { type: 'game.start' })).ok).toBe(true);
+    await expire(running, room, actors[0]);
+    while (describing()) {
+      const turn = actors.find(a => a.playerId === room.game!.turnPlayerId)!;
+      expect((await send(turn, { type: 'game.describe', text: `Indice public ${room.game!.descriptions.length + 1}` }, { phaseId: room.game!.phaseId })).ok).toBe(true);
+    }
+    expect((await send(actors[0], { type: 'game.skipDiscussion' }, { phaseId: room.game!.phaseId })).ok).toBe(true);
+    await expire(running, room, actors[0]); // An empty vote opens a second round.
+    const first = actors.find(a => a.playerId === room.game!.turnPlayerId)!;
+    expect((await send(first, { type: 'game.describe', text: 'Indice récent' }, { phaseId: room.game!.phaseId })).ok).toBe(true);
+    const descriptions = structuredClone(room.game!.descriptions);
+    const phaseId = room.game!.phaseId;
+    const deadline = room.game!.deadline;
+    const turnIndex = actors.findIndex(a => a.playerId === room.game!.turnPlayerId);
+    const disconnected = actors[turnIndex];
+    const originalWord = disconnected.secret!.word;
+    disconnected.socket.disconnect();
+    const resumed = await actor(running, url, disconnected);
+    actors[turnIndex] = resumed;
+    expect((await send(resumed, { type: 'room.resume' })).ok).toBe(true);
+    await expect.poll(() => resumed.secret?.inGame).toBe(true);
+    expect(resumed.secret!.word).toBe(originalWord);
+    expect(resumed.snapshot!.players.find(p => p.id === resumed.playerId)).toMatchObject({ connected: true, waiting: false, alive: true });
+    expect(resumed.snapshot!.game).toMatchObject({ phaseId, deadline, descriptions });
+
+    const late = await actor(running, url);
+    expect((await send(late, { type: 'room.join', code, name: 'Nouveau René', appearance: DEFAULT_APPEARANCE })).ok).toBe(true);
+    await expect.poll(() => late.snapshot?.game?.descriptions).toEqual(descriptions);
+    expect(late.snapshot!.game).toMatchObject({ phaseId, deadline });
+    expect(late.secret).toMatchObject({ inGame: false, word: null, voteTarget: null });
+    expect(late.snapshot!.players.find(p => p.id === late.playerId)).toMatchObject({ waiting: true, alive: false });
+    expect(late.snapshot!.game).not.toHaveProperty('roles');
+    expect(late.snapshot!.game).not.toHaveProperty('words');
+    expect((await send(late, { type: 'game.describe', text: 'Je ne dois pas interrompre le tour' })).ok).toBe(false);
+    expect(room.game!.descriptions).toEqual(descriptions);
+    expect((await send(resumed, { type: 'game.describe', text: 'Indice après reconnexion' }, { phaseId: room.game!.phaseId })).ok).toBe(true);
+
+    while (describing()) {
+      const turn = actors.find(a => a.playerId === room.game!.turnPlayerId)!;
+      expect((await send(turn, { type: 'game.describe', text: 'Indice de fin de tour' }, { phaseId: room.game!.phaseId })).ok).toBe(true);
+    }
+    expect((await send(actors[0], { type: 'game.skipDiscussion' }, { phaseId: room.game!.phaseId })).ok).toBe(true);
+    const target = room.game!.alive.find(id => room.game!.roles[id] === 'undercover')!;
+    const votePhase = room.game!.phaseId;
+    for (const a of actors) {
+      expect((await send(a, { type: 'game.vote', targetId: a.playerId === target ? actors.find(other => other.playerId !== target)!.playerId : target }, { phaseId: votePhase })).ok).toBe(true);
+    }
+    await expire(running, room, actors[0]);
+    expect(room.game!.phase).toBe('results');
+    expect((await send(actors[0], { type: 'game.next' })).ok).toBe(true);
+    await expect.poll(() => late.snapshot?.game).toBeNull();
+    expect(late.snapshot!.players.find(p => p.id === late.playerId)).toMatchObject({ waiting: false, alive: true, ready: false });
+    for (const a of [...actors, late]) expect((await send(a, { type: 'player.ready', ready: true })).ok).toBe(true);
+    expect((await send(actors[0], { type: 'game.start' })).ok).toBe(true);
+    await expect.poll(() => late.secret?.inGame).toBe(true);
+    expect(room.game!.playerIds).toContain(late.playerId);
+    expect(late.snapshot!.game!.order).toContain(late.playerId);
+    expect(late.snapshot!.game!.descriptions).toEqual([]);
+  });
   it('shares role-independent player marks and keeps them with the same appearance and opening seat after reconnect', async () => {
     const { running, url, actors, room } = await opened(8);
     const appearance = { ...DEFAULT_APPEARANCE, hair: 'bun' as const, body: '#F34531' as const };

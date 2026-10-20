@@ -5,6 +5,7 @@ import { AvatarPortrait } from './AvatarPortrait';
 import { PlayerName } from './PlayerName';
 import { VoteReadiness } from './VoteReadiness';
 import { RoleReveal, roleName } from './RoleReveal';
+import { ThemeSummary } from './ThemeSummary';
 const phaseName: Record<Phase, string> = { reveal: 'Le secret est distribué.', description: 'Un petit indice ?', discussion: 'Parlons franchement.', vote: 'Qui vous paraît louche ?', tiebreak: 'On vous départage.', elimination: 'Le salon a tranché.', whiteGuess: 'Un dernier mot ?', results: 'Les masques tombent.' };
 export function Timer({ deadline }: { deadline: number | null }) {
   const offset = useGame(s => s.offset); const [now, setNow] = useState(Date.now());
@@ -16,19 +17,33 @@ function ActionInput({ kind, placeholder, label }: { kind: 'game.describe' | 'ga
   const [value, setValue] = useState(''); const [busy, setBusy] = useState(false);
   return <form className="action-input" onSubmit={async event => { event.preventDefault(); setBusy(true); if (await send(kind === 'game.describe' ? { type: kind, text: value } : { type: kind, word: value })) setValue(''); setBusy(false); }}><label className="field">{label}<input autoComplete="off" autoFocus aria-label={label} value={value} onChange={e => setValue(e.target.value)} maxLength={100} placeholder={placeholder} required /></label><button className="button button-red" disabled={!value.trim() || busy}>Valider mon {kind === 'game.guess' ? 'mot' : 'indice'} →</button></form>;
 }
-export function Gameplay({ room }: { room: RoomSnapshot }) {
+export function Gameplay({ room, onShowClues, onEditThemes }: { room: RoomSnapshot; onShowClues?: () => void; onEditThemes?: () => void }) {
   const me = useGame(s => s.session!.playerId); const secret = useGame(s => s.secret); const connected = useGame(s => s.connected);
   const [revealed, setRevealed] = useState(false); const [busy, setBusy] = useState(false);
   const game = room.game; const player = room.players.find(p => p.id === me); const host = me === room.hostId;
   useEffect(() => setRevealed(false), [game?.id]);
   if (!game) {
     const roles = roleCounts(room.players.length, room.settings); const ready = room.players.filter(p => p.ready).length;
-    return <section className="game-panel lobby-panel"><div className="lobby-copy"><div className="eyebrow">LA SALLE D’ATTENTE LA PLUS SUSPECTE</div><h2>Tout le monde<br /> est là ?</h2><p>Installez-vous, présentez votre drôle de tête.<br />La confiance, on verra plus tard.</p><div className="lobby-portraits" aria-label={`${room.players.length} suspects sur 12 places`}>{room.players.map(p => <div key={p.id} title={`${p.name} · ${p.ready ? 'prêt' : 'en attente'}`} className={p.ready ? 'ready' : ''}><AvatarPortrait appearance={p.appearance} /><span>{p.ready ? '✓' : '·'}</span></div>)}<span className="lobby-capacity">{room.players.length}/12</span></div><div className="role-strip"><span>{roles.civilian} Civils</span><span>{roles.undercover} Undercover</span><span>{roles.white} Mr. White</span></div><div className="ready-status"><span>{ready}/{room.players.length} prêts à mentir</span><span>{room.settings.roundsPerSession} parties</span></div></div><div className="lobby-actions"><button className={`button ${player?.ready ? 'button-green' : 'button-yellow'}`} disabled={!connected} onClick={() => void send({ type: 'player.ready', ready: !player?.ready })}>{player?.ready ? '✓ Je suis prêt' : 'Je suis prêt →'}</button>{host && <button className="button button-dark" disabled={!connected || !validComposition(room.players.length, room.settings) || ready !== room.players.length || busy} onClick={async () => { setBusy(true); await send({ type: 'game.start' }); setBusy(false); }}>Lancer la partie ↗</button>}</div><p className="hint">{room.players.length < 4 ? `Encore ${4 - room.players.length} ${4 - room.players.length > 1 ? 'amis' : 'ami'} pour démarrer.` : host ? 'Tout le monde doit être prêt pour commencer.' : 'L’hôte lancera la partie quand tout le monde sera prêt.'}</p></section>;
+    return <section className="game-panel lobby-panel">
+      <div className="lobby-copy">
+        <div className="eyebrow">LA SALLE D’ATTENTE LA PLUS SUSPECTE</div>
+        <h2>Tout le monde<br /> est là ?</h2>
+        <p>Installez-vous, présentez votre drôle de tête.<br />La confiance, on verra plus tard.</p>
+        <div className="lobby-portraits" aria-label={`${room.players.length} suspects sur 12 places`}>{room.players.map(p => <div key={p.id} title={`${p.name} · ${p.ready ? 'prêt' : 'en attente'}`} className={p.ready ? 'ready' : ''}><AvatarPortrait appearance={p.appearance} /><span>{p.ready ? '✓' : '·'}</span></div>)}<span className="lobby-capacity">{room.players.length}/12</span></div>
+        <div className="role-strip"><span>{roles.civilian} Civils</span><span>{roles.undercover} Undercover</span><span>{roles.white} Mr. White</span></div>
+      </div>
+      <div className="lobby-footer">
+        <ThemeSummary settings={room.settings} onEdit={onEditThemes} />
+        <div className="ready-status"><span>{ready}/{room.players.length} prêts à mentir</span><span>{room.settings.roundsPerSession} parties</span></div>
+        <div className="lobby-actions"><button className={`button ${player?.ready ? 'button-green' : 'button-yellow'}`} disabled={!connected} onClick={() => void send({ type: 'player.ready', ready: !player?.ready })}>{player?.ready ? '✓ Je suis prêt' : 'Je suis prêt →'}</button>{host && <button className="button button-dark" disabled={!connected || !validComposition(room.players.length, room.settings) || ready !== room.players.length || busy} onClick={async () => { setBusy(true); await send({ type: 'game.start' }); setBusy(false); }}>Lancer la partie ↗</button>}</div>
+        <p className="hint">{room.players.length < 4 ? `Encore ${4 - room.players.length} ${4 - room.players.length > 1 ? 'amis' : 'ami'} pour démarrer.` : host ? 'Tout le monde doit être prêt pour commencer.' : 'L’hôte lancera la partie quand tout le monde sera prêt.'}</p>
+      </div>
+    </section>;
   }
   const active = game.phase !== 'results'; const turn = room.players.find(p => p.id === game.turnPlayerId); const eliminated = room.players.find(p => p.id === game.eliminatedPlayerId);
   return <section className={`game-panel phase-${game.phase}`}><header className="game-heading"><div className="phase-heading"><span className="eyebrow">PARTIE {room.completedGames + (game.phase === 'results' && !room.resultsPending ? 0 : 1)} / {room.settings.roundsPerSession} · TOUR {game.round}</span><Timer deadline={game.deadline} /></div><h2>{phaseName[game.phase]}</h2></header>
     {active && secret?.inGame && <button className={`secret-card ${revealed ? 'is-open' : ''}`} onClick={() => setRevealed(!revealed)} aria-expanded={revealed}><span className="eyebrow">STRICTEMENT ENTRE NOUS</span><strong>{revealed ? secret.word ?? 'Aucun mot. Improvisez.' : 'Votre mot secret'}</strong><span>{revealed ? secret.word ? 'Civil ou Undercover ? À vous de comprendre. · Masquer' : 'Vous êtes Mr. White. Écoutez bien les indices. · Masquer' : 'Touchez pour regarder. Personne d’autre ne le voit. ↗'}</span></button>}
-    {active && player?.waiting && <p className="callout">Vous êtes dans les gradins. Vous pourrez jouer dès la prochaine partie.</p>}
+    {active && player?.waiting && <div className="callout waiting-notice" role="status"><strong>Vous jouez à la prochaine partie.</strong><p>Celle-ci a déjà commencé. Retrouvez les indices déjà donnés pendant que les autres jouent.</p>{onShowClues && <button className="text-button" onClick={onShowClues}>Voir les indices déjà donnés ↗</button>}</div>}
     {active && player && !player.alive && !player.waiting && game.whitePlayerId !== me && <p className="callout">Vous êtes éliminé. Profitez du spectacle.{!room.settings.deadCanSpeak && ' Les vivants ne vous entendent plus.'}</p>}
     {game.phase === 'reveal' && <p>Regardez votre mot en secret. Donnez ensuite un indice assez clair pour vos alliés, assez flou pour les autres.</p>}
     {game.phase === 'description' && turn && <><div className={`turn-notice ${turn.id === me && player?.alive && !player.waiting ? 'your-turn' : ''}`} role="status"><AvatarPortrait appearance={turn.appearance} /><div><span className="eyebrow">{turn.id === me && player?.alive && !player.waiting ? 'C’EST À VOUS !' : 'AU TOUR DE'}</span><strong><PlayerName name={turn.name} mark={game.playerMarks[turn.id]} /></strong><p>{turn.id === me && player?.alive && !player.waiting ? 'À VOUS DE DONNER UN INDICE.' : `${turn.name} cherche son indice…`}</p></div><Timer deadline={game.deadline} /></div>{turn.id === me && player?.alive && !player.waiting ? <ActionInput key={game.phaseId} kind="game.describe" placeholder="Un mot, une petite phrase…" label="Votre indice" /> : <p>Écoutez bien. Chaque détail compte.</p>}</>}

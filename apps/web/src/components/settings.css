@@ -1,0 +1,24 @@
+.room-settings .word-themes { padding: 0; margin: 0 0 1rem; border: 0; min-width: 0; }
+.word-themes legend { font-weight: 900; font-size: 1.15rem; padding: 0; }
+.word-theme-presets { display: flex; flex-wrap: wrap; gap: .4rem; margin: .7rem 0; }
+.word-theme-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem; }
+.word-theme-chip { position: relative; display: flex; align-items: center; gap: .4rem; padding: .6rem .5rem; border: 2px solid var(--ink, #191719); border-radius: .6rem; background: #fff; cursor: pointer; min-height: 44px; line-height: 1.2; font-size: .8rem; font-weight: 800; }
+.word-theme-chip:has(input:checked) { background: var(--yellow, #f5e742); }
+.word-theme-chip:has(input:focus-visible), .adult-theme:has(input:focus-visible) { outline: 3px solid #087ba0; outline-offset: 3px; }
+.word-theme-chip input, .adult-theme input { flex: none; width: 1.05rem; height: 1.05rem; accent-color: #191719; margin: 0; }
+.word-theme-chip span { min-width: 0; overflow-wrap: anywhere; }
+.adult-theme { display: flex; align-items: flex-start; gap: .65rem; margin-top: .8rem; padding: .8rem; border: 2px solid #191719; border-radius: .6rem; cursor: pointer; background: #f5f2ea; }
+.adult-theme.is-active { background: #ee89ba; }
+.adult-theme input { margin-top: .2rem; }
+.adult-theme strong, .adult-theme small { display: block; }
+.adult-theme strong { font-size: .95rem; }
+.adult-theme small { font-size: .76rem; line-height: 1.45; margin-top: .2rem; }
+.word-theme-count { min-height: 1.2rem; font-size: .75rem; font-weight: 700; margin: .6rem 0 0; }
+.theme-summary { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 2px solid #191719; border-radius: .65rem; background: #f5f2ea; margin: 0; min-width: 0; }
+.theme-summary-copy { flex: 1; min-width: 0; }
+.theme-summary-heading { display: flex; gap: 6px; align-items: center; min-width: 0; margin-bottom: 3px; }
+.theme-summary-heading strong { font-size: .75rem; }
+.theme-summary p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin: 0; font-size: .72rem; line-height: 1.3; overflow-wrap: anywhere; }
+.room-page .lobby-footer .theme-summary .button { flex: 0 0 auto; min-width: 44px; min-height: 44px; padding: 6px 8px; font-size: 11px; }
+.theme-adult-badge { flex: 0 0 auto; white-space: nowrap; border: 1.5px solid #191719; border-radius: .3rem; background: #ee89ba; padding: .12rem .35rem; font-weight: 900; font-size: .65rem; }
+@media (max-width: 420px) { .word-theme-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

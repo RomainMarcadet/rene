@@ -2,7 +2,7 @@ import { test, expect, type Browser, type Page } from '@playwright/test';
 import { setMicrophoneMode, showPanel, submitDescription, voiceSettings } from './helpers';
 
 test.skip(process.env.RENE_VOICE_E2E !== '1', 'Requires the local LiveKit service (RENE_VOICE_E2E=1).');
-test.use({ launchOptions: { args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'] } });
+test.use({ launchOptions: { executablePath: process.env.RENE_CHROMIUM_EXECUTABLE_PATH, args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'] } });
 
 async function pair(browser: Browser, baseURL: string) {
   const contexts = await Promise.all([0, 1].map(() => browser.newContext({ baseURL, permissions: ['microphone'] })));

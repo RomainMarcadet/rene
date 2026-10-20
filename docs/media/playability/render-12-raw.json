@@ -1,0 +1,61 @@
+{
+  "before": {
+    "names": [
+      "appearance:egg:bowl:uneven:grin:round:earrings",
+      "appearance:potato:buns:wink:tongue:snout:flower",
+      "appearance:tall:mohawk:angry:crooked:hook:monocle",
+      "appearance:mushroom:fringe:dreamy:pout:small:bowtie",
+      "appearance:peanut:sidepart:worried:tooth:long:glasses",
+      "appearance:wedge:curls:sideways:frown:none:moustache",
+      "appearance:square:bob:wide:grin:snout:sunglasses",
+      "appearance:bean:bun:sleepy:smile:hook:eyepatch",
+      "appearance:pear:none:tiny:surprised:round:crown",
+      "appearance:tall:none:worried:tooth:small:beret",
+      "appearance:potato:none:uneven:flat:long:cap",
+      "appearance:egg:none:dreamy:pout:snout:beanie"
+    ],
+    "meshes": 403,
+    "geometries": 62,
+    "materials": 66,
+    "calls": 355,
+    "triangles": 35664
+  },
+  "active": {
+    "names": [
+      "appearance:egg:bowl:uneven:grin:round:earrings",
+      "appearance:potato:buns:wink:tongue:snout:flower",
+      "appearance:tall:mohawk:angry:crooked:hook:monocle",
+      "appearance:mushroom:fringe:dreamy:pout:small:bowtie",
+      "appearance:peanut:sidepart:worried:tooth:long:glasses",
+      "appearance:wedge:curls:sideways:frown:none:moustache",
+      "appearance:square:bob:wide:grin:snout:sunglasses",
+      "appearance:bean:bun:sleepy:smile:hook:eyepatch",
+      "appearance:pear:none:tiny:surprised:round:crown",
+      "appearance:tall:none:worried:tooth:small:beret",
+      "appearance:potato:none:uneven:flat:long:cap",
+      "appearance:egg:none:dreamy:pout:snout:beanie"
+    ],
+    "meshes": 403,
+    "geometries": 62,
+    "materials": 66,
+    "calls": 355,
+    "triangles": 35664
+  },
+  "idleOneSecond": {
+    "messages": 0,
+    "bytes": 0,
+    "privateMessages": 0
+  },
+  "startupAndThreeSeconds": {
+    "messages": 12,
+    "bytes": 88959,
+    "privateMessages": 0
+  },
+  "timing": {
+    "calls": 12000,
+    "legacyDanceMs": 33.200000000186265,
+    "elapsedMs": 51.1999999997206,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.8078.4 Safari/537.36",
+    "dpr": 1
+  }
+}

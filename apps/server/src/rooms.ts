@@ -3,7 +3,7 @@ import {
   ANIMATIONS, DEFAULT_SETTINGS, validComposition, canMoveInPhase, voteSeat, SALON_BOUNDS, TABLE_BLOCKER, isSocialCommand, socialMovementAllowed, type AvatarAppearance, type ChatMessage, type ChatReaction,
   type Command, type PublicPlayer, type RoomSettings, type RoomSnapshot, type PrivatePlayerState,
 } from '@rene/contracts';
-import { createGame, applyGameAction, chooseWordPair, publicGame, privateGame, type GameState } from '@rene/engine';
+import { createGame, applyGameAction, chooseWordPair, recordWordSelection, publicGame, privateGame, type GameState } from '@rene/engine';
 import { createSocial, createSocialPlayer, handleSocial, resetSocial, tickSocial, socialSnapshot, cancelSocialReferences, cancelVoluntary, type SocialRuntime, type ServerSocialPlayer } from './social.js';
 import type { Guest, Persistence } from './persistence.js';
 
@@ -120,9 +120,7 @@ export class Rooms {
         const pair = chooseWordPair(room.settings, room.usedWords, this.random);
         room.game = createGame({ id: randomUUID(), playerIds: players.map(p => p.id), settings: room.settings, pair, now, random: this.random });
         resetSocial(room);
-        room.usedWords.push(pair.id);
-        // Keep a bounded history; choosing the pair handles exhaustion of the selected catalogue.
-        if (room.usedWords.length > 1000) room.usedWords.splice(0, 500);
+        recordWordSelection(room.usedWords, pair.id);
         room.chat = []; room.chatReactions.clear();
         for (const p of players) { p.waiting = false; p.alive = true; p.ready = false; }
         room.voiceGeneration++;
@@ -243,10 +241,12 @@ export class Rooms {
     const z = Math.max(-SALON_BOUNDS.z, Math.min(SALON_BOUNDS.z, player.position.z + direction.z / magnitude * dt * 3.2));
     // Shared scene table has a 2.6 x 1.6 footprint; keep avatars outside it.
     if (Math.abs(x) < TABLE_BLOCKER.x && Math.abs(z) < TABLE_BLOCKER.z) return false;
+    const yaw = direction.x || direction.z ? Math.atan2(direction.x, direction.z) : player.position.yaw;
+    if (x === player.position.x && z === player.position.z && yaw === player.position.yaw) return false;
     if ((direction.x || direction.z) && player.social.animation && !ANIMATIONS[player.social.animation.kind].moving) {
       cancelVoluntary(room, player); room.revision++;
     }
-    player.position = { x, z, yaw: direction.x || direction.z ? Math.atan2(direction.x, direction.z) : player.position.yaw };
+    player.position = { x, z, yaw };
     return true;
   }
 

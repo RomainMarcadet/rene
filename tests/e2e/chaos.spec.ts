@@ -4,9 +4,9 @@ import { ANIMATION_IDS, type Ack, type Command, type RoomSnapshot } from '@rene/
 import { AVATAR_SPECIMENS } from '../../apps/web/src/avatar/specimens';
 import { avatarScene } from './avatarScene';
 import { mkdir, writeFile } from 'node:fs/promises';
-test.use({ viewport: { width: 1586, height: 992 }, video: { mode: 'on', size: { width: 1280, height: 800 } }, launchOptions: { args: ['--autoplay-policy=no-user-gesture-required'] } });
-test.afterEach(async ({ page }, info) => { const video = page.video(); await page.close(); if (video && info.status === 'passed') { await mkdir('output/playwright', { recursive: true }); await video.saveAs('output/playwright/v1.5-' + (info.title.startsWith('ground target') ? 'ground-availability' : info.title.startsWith('prototype') ? 'combat' : info.title.startsWith('postures') ? 'catalogue' : info.title.startsWith('stunned') ? 'gameplay' : info.title.startsWith('mobile touch') ? 'mobile-controls' : info.title.startsWith('8 ') ? 'eight' : 'twelve') + '.webm'); } });
-async function state(page: Page): Promise<RoomSnapshot> { return page.evaluate(async () => { const path = '/src/store.ts'; return (await import(path)).useGame.getState().room; }); }
+test.use({ viewport: { width: 1586, height: 992 }, video: { mode: 'on', size: { width: 1280, height: 800 } }, launchOptions: { executablePath: process.env.RENE_CHROMIUM_EXECUTABLE_PATH, args: ['--autoplay-policy=no-user-gesture-required'] } });
+test.afterEach(async ({ page }, info) => { const video = page.video(); await page.close(); if (video && info.status === 'passed') { await mkdir('output/playwright', { recursive: true }); await video.saveAs('output/playwright/v1.5-' + (info.title.startsWith('ground target') ? 'ground-availability' : info.title.startsWith('direct avatar') ? 'direct-controls' : info.title.startsWith('motion packets') ? 'motion-performance' : info.title.startsWith('prototype') ? 'combat' : info.title.startsWith('postures') ? 'catalogue' : info.title.startsWith('stunned') ? 'gameplay' : info.title.startsWith('mobile touch') ? 'mobile-controls' : info.title.startsWith('8 ') ? 'eight' : 'twelve') + '.webm'); } });
+async function state(page: Page): Promise<RoomSnapshot> { return page.evaluate(async () => { const path = '/src/store.ts'; const posePath = '/src/poses.ts'; const room = (await import(path)).useGame.getState().room; const { getPose } = await import(posePath); return { ...room, players: room.players.map((player: { id: string; position: { x: number; z: number; yaw: number } }) => ({ ...player, position: getPose(player.id, player.position) })) }; }); }
 async function ui(page: Page, command: Command) { return page.evaluate(async command => { const path = '/src/store.ts'; return (await import(path)).send(command); }, command); }
 type Actor = { id: string; socket: Socket; context: APIRequestContext; snapshot?: RoomSnapshot; impacts: Set<string>; contributions: Map<string, number> };
 async function send(a: Actor, command: Command, id = crypto.randomUUID()) {
@@ -47,7 +47,7 @@ test('ground target availability advances while the picker stays open and the sa
     const target = f.actors[0]; await moveTo(target, 4, 1.2);
     await page.getByRole('button', { name: 'Animations et interactions' }).click();
     await page.getByRole('button', { name: 'Interactions', exact: true }).click();
-    await page.getByLabel('Cible des interactions').selectOption(target.id);
+    await page.locator('.social-targets').getByRole('button', { name: 'Interagir avec Lou', exact: true }).click();
     const taunt = page.getByRole('button', { name: 'T-bag cartoon', exact: true });
     await expect(taunt).toBeDisabled();
     expect((await send(target, { type: 'player.emote', kind: 'play_dead' })).ok).toBe(true);
@@ -60,6 +60,72 @@ test('ground target availability advances while the picker stays open and the sa
     expect(after.social).toEqual(before.social);
     await taunt.click();
     await expect.poll(async () => (await state(page)).social.players[before.hostId].animation?.kind).toBe('crouch_taunt');
+  } finally { await f.close(); }
+});
+test('direct avatar selection and quick keys preserve movement, drafts and consent', async ({ page, playwright, baseURL }) => {
+  const f = await setup(page, playwright.request, baseURL!, 4);
+  try {
+    const target = f.actors[0]; await moveTo(target, 4, 1.2);
+    await page.locator(`.avatar-label[data-player-id="${target.id}"]`).click();
+    const picker = page.getByRole('dialog', { name: 'Le petit chaos.' });
+    await expect(picker).toHaveAttribute('aria-modal', 'false');
+    await expect(picker.getByRole('heading', { name: 'Avec Lou.' })).toBeVisible();
+    await expect(picker.getByRole('combobox')).toHaveCount(0);
+    await picker.getByRole('button', { name: 'Proposer un câlin', exact: true }).click();
+    await expect.poll(() => target.snapshot?.social.interactions[0]?.state).toBe('invited');
+    expect(target.snapshot?.social.players[target.id].animation?.kind).not.toBe('hug');
+    const invitation = target.snapshot!.social.interactions[0];
+    expect((await send(target, { type: 'player.interaction.respond', interactionId: invitation.id, accept: false })).ok).toBe(true);
+    await page.keyboard.press('h');
+    const host = (await state(page)).hostId;
+    await expect.poll(async () => (await state(page)).social.players[host].animation?.kind).toBe('wave');
+    await page.keyboard.press('x');
+    await expect.poll(async () => (await state(page)).social.players[host].animation).toBeUndefined();
+    const chat = page.getByRole('textbox', { name: 'Message' });
+    await chat.fill('hjkbefx');
+    await page.keyboard.press('h');
+    await expect(chat).toHaveValue('hjkbefxh');
+    await expect(picker).toHaveCount(0);
+    expect((await state(page)).social.players[host].animation).toBeUndefined();
+    await chat.blur();
+    await page.keyboard.press('e');
+    await expect(picker.getByRole('heading', { name: 'Avec Lou.' })).toBeVisible();
+    const before = (await state(page)).players.find(p => p.id === host)!.position.x;
+    await page.keyboard.down('d');
+    await expect.poll(async () => (await state(page)).players.find(p => p.id === host)!.position.x).toBeGreaterThan(before + .3);
+    await page.keyboard.up('d');
+    await expect(picker).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(picker).toHaveCount(0);
+    await expect(chat).toHaveValue('hjkbefxh');
+  } finally { await page.keyboard.up('d'); await f.close(); }
+});
+
+test('motion packets animate the scene without rerendering gameplay and use one arm stroke per side', async ({ page, playwright, baseURL }, info) => {
+  const f = await setup(page, playwright.request, baseURL!, 4);
+  try {
+    const actor = f.actors[0];
+    await page.evaluate(async () => {
+      const path = '/src/store.ts'; const game = (await import(path)).useGame;
+      Object.assign(window, { __gameplayNotifications: 0, __stopGameplayObservation: game.subscribe(() => { (window as unknown as { __gameplayNotifications: number }).__gameplayNotifications++; }) });
+    });
+    const before = await state(page); const initial = before.players.find(p => p.id === actor.id)!.position;
+    await moveTo(actor, initial.x + .6, initial.z);
+    const notifications = await page.evaluate(() => (window as unknown as { __gameplayNotifications: number }).__gameplayNotifications);
+    expect(notifications).toBe(0);
+    await expect.poll(() => page.evaluate(async id => {
+      const path = '/node_modules/.vite/deps/@react-three_fiber.js'; const { _roots } = await import(path);
+      return [..._roots.values()][0].store.getState().scene.getObjectByName(`avatar:${id}`)?.position.x;
+    }, actor.id)).toBeGreaterThan(initial.x + .3);
+    const rendered = await page.evaluate(async () => {
+      const path = '/node_modules/.vite/deps/@react-three_fiber.js'; const { _roots } = await import(path);
+      const state = [..._roots.values()][0].store.getState(); let arms = 0; let hands = 0;
+      state.scene.traverse((object: { name: string }) => { if (object.name === 'avatar-arm') arms++; if (object.name === 'avatar-hand') hands++; });
+      return { arms, hands, calls: state.gl.info.render.calls, triangles: state.gl.info.render.triangles, dpr: state.gl.getPixelRatio() };
+    });
+    expect(rendered.arms).toBe(8); expect(rendered.hands).toBe(8); expect(rendered.dpr).toBeLessThanOrEqual(1.25);
+    await info.attach('motion-and-render', { body: JSON.stringify({ gameplayNotifications: notifications, rendered }), contentType: 'application/json' });
+    await page.evaluate(() => (window as unknown as { __stopGameplayObservation: () => void }).__stopGameplayObservation());
   } finally { await f.close(); }
 });
 test('prototype: authoritative punch, fifth impact, fall, recovery and protection with distinct avatars', async ({ page, playwright, baseURL }, info) => {
@@ -76,6 +142,7 @@ test('prototype: authoritative punch, fifth impact, fall, recovery and protectio
     await expect.poll(() => f.actors[0].impacts.size).toBe(5);
     await expect.poll(async () => (await state(page)).social.players[target].physical?.kind).toBe('stun');
     const social = (await state(page)).social.players[target]; expect(social.physical?.kind).toBe('stun');
+    await page.locator('.avatar-label[data-player-id="' + target + '"]').focus();
     await expect(page.locator('.social-status').filter({ hasText: 'À terre' })).toBeVisible();
     expect((await send(f.actors[0], { type: 'player.attack', kind: 'punch', targetId: id })).ok).toBe(false);
     const bodyRoll = await page.evaluate(async () => {

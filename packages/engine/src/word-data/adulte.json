@@ -1,0 +1,405 @@
+{
+  "category": "adulte",
+  "pairs": [
+    {
+      "id": "v14-politique-e004",
+      "a": "Marine Le Pen",
+      "b": "Jean-Luc Mélenchon",
+      "difficulty": "easy",
+      "clueAxes": [
+        "candidature présidentielle",
+        "opposition"
+      ]
+    },
+    {
+      "id": "v16-adulte-002",
+      "a": "Adolf Hitler",
+      "b": "Benyamin Netanyahou",
+      "difficulty": "easy",
+      "clueAxes": [
+        "dirigeant politique",
+        "conflit armé"
+      ]
+    },
+    {
+      "id": "v16-adulte-003",
+      "a": "Vladimir Poutine",
+      "b": "Kim Jong-un",
+      "difficulty": "easy",
+      "clueAxes": [
+        "chef d'État",
+        "arsenal nucléaire"
+      ]
+    },
+    {
+      "id": "v16-adulte-004",
+      "a": "Donald Trump",
+      "b": "Silvio Berlusconi",
+      "difficulty": "easy",
+      "clueAxes": [
+        "homme d'affaires",
+        "carrière politique"
+      ]
+    },
+    {
+      "id": "v16-adulte-005",
+      "a": "Joseph Staline",
+      "b": "Mao Zedong",
+      "difficulty": "medium",
+      "clueAxes": [
+        "dirigeant du vingtième siècle",
+        "régime communiste"
+      ]
+    },
+    {
+      "id": "v16-adulte-006",
+      "a": "Augusto Pinochet",
+      "b": "Francisco Franco",
+      "difficulty": "hard",
+      "clueAxes": [
+        "militaire au pouvoir",
+        "dictature"
+      ]
+    },
+    {
+      "id": "v16-adulte-007",
+      "a": "Bachar al-Assad",
+      "b": "Saddam Hussein",
+      "difficulty": "medium",
+      "clueAxes": [
+        "dirigeant du Moyen-Orient",
+        "régime autoritaire"
+      ]
+    },
+    {
+      "id": "v16-adulte-008",
+      "a": "Al Capone",
+      "b": "Pablo Escobar",
+      "difficulty": "easy",
+      "clueAxes": [
+        "criminalité organisée",
+        "trafic"
+      ]
+    },
+    {
+      "id": "v16-adulte-009",
+      "a": "Charles Ponzi",
+      "b": "Bernard Madoff",
+      "difficulty": "hard",
+      "clueAxes": [
+        "escroquerie financière",
+        "promesse de rendement"
+      ]
+    },
+    {
+      "id": "v16-adulte-010",
+      "a": "Bonnie et Clyde",
+      "b": "Les Dalton",
+      "difficulty": "easy",
+      "clueAxes": [
+        "bande criminelle",
+        "poursuite"
+      ]
+    },
+    {
+      "id": "v16-adulte-011",
+      "a": "Hannibal Lecter",
+      "b": "Patrick Bateman",
+      "difficulty": "medium",
+      "clueAxes": [
+        "tueur de fiction",
+        "apparence raffinée"
+      ]
+    },
+    {
+      "id": "v16-adulte-012",
+      "a": "Hannibal Lecter",
+      "b": "Dexter Morgan",
+      "difficulty": "medium",
+      "clueAxes": [
+        "tueur de fiction",
+        "double vie"
+      ]
+    },
+    {
+      "id": "v16-adulte-013",
+      "a": "Croque-mort",
+      "b": "Organisateur de mariage",
+      "difficulty": "medium",
+      "clueAxes": [
+        "cérémonie",
+        "costume"
+      ]
+    },
+    {
+      "id": "v16-adulte-014",
+      "a": "Cercueil",
+      "b": "Lit une place",
+      "difficulty": "easy",
+      "clueAxes": [
+        "position allongée",
+        "mobilier individuel"
+      ]
+    },
+    {
+      "id": "v16-adulte-015",
+      "a": "Crématorium",
+      "b": "Barbecue",
+      "difficulty": "easy",
+      "clueAxes": [
+        "chaleur",
+        "combustion"
+      ]
+    },
+    {
+      "id": "v16-adulte-016",
+      "a": "Testament",
+      "b": "Liste de mariage",
+      "difficulty": "medium",
+      "clueAxes": [
+        "transmission de biens",
+        "liste écrite"
+      ]
+    },
+    {
+      "id": "v16-adulte-017",
+      "a": "Épitaphe",
+      "b": "Biographie Instagram",
+      "difficulty": "medium",
+      "clueAxes": [
+        "présentation en quelques mots",
+        "identité publique"
+      ]
+    },
+    {
+      "id": "v16-adulte-018",
+      "a": "Cimetière",
+      "b": "Résidence secondaire",
+      "difficulty": "medium",
+      "clueAxes": [
+        "adresse durable",
+        "calme"
+      ]
+    },
+    {
+      "id": "v16-adulte-019",
+      "a": "Faucheuse",
+      "b": "Contrôleur fiscal",
+      "difficulty": "easy",
+      "clueAxes": [
+        "visite redoutée",
+        "échéance"
+      ]
+    },
+    {
+      "id": "v16-adulte-020",
+      "a": "Bombe à retardement",
+      "b": "Gueule de bois",
+      "difficulty": "easy",
+      "clueAxes": [
+        "effet différé",
+        "lendemain difficile"
+      ]
+    },
+    {
+      "id": "v16-adulte-021",
+      "a": "Propagande",
+      "b": "Publicité",
+      "difficulty": "easy",
+      "clueAxes": [
+        "persuasion",
+        "message diffusé"
+      ]
+    },
+    {
+      "id": "v16-adulte-022",
+      "a": "Dictature",
+      "b": "Conseil de copropriété",
+      "difficulty": "medium",
+      "clueAxes": [
+        "règles imposées",
+        "conflit d'autorité"
+      ]
+    },
+    {
+      "id": "v16-adulte-023",
+      "a": "Interrogatoire",
+      "b": "Repas de famille",
+      "difficulty": "easy",
+      "clueAxes": [
+        "questions insistantes",
+        "malaise"
+      ]
+    },
+    {
+      "id": "v16-adulte-024",
+      "a": "Garde à vue",
+      "b": "Séminaire d'entreprise",
+      "difficulty": "medium",
+      "clueAxes": [
+        "présence prolongée",
+        "questions collectives"
+      ]
+    },
+    {
+      "id": "v16-adulte-025",
+      "a": "Mafia",
+      "b": "Comité de direction",
+      "difficulty": "medium",
+      "clueAxes": [
+        "hiérarchie",
+        "réunion fermée"
+      ]
+    },
+    {
+      "id": "v16-adulte-026",
+      "a": "Braquage",
+      "b": "Passage à la pompe",
+      "difficulty": "easy",
+      "clueAxes": [
+        "argent qui disparaît",
+        "sentiment de dépossession"
+      ]
+    },
+    {
+      "id": "v16-adulte-027",
+      "a": "Prise d'otages",
+      "b": "Réunion sans ordre du jour",
+      "difficulty": "medium",
+      "clueAxes": [
+        "attente forcée",
+        "sortie espérée"
+      ]
+    },
+    {
+      "id": "v16-adulte-028",
+      "a": "Paradis fiscal",
+      "b": "Île déserte",
+      "difficulty": "medium",
+      "clueAxes": [
+        "évasion",
+        "éloignement"
+      ]
+    },
+    {
+      "id": "v16-adulte-029",
+      "a": "Corruption",
+      "b": "Pourboire",
+      "difficulty": "medium",
+      "clueAxes": [
+        "argent remis",
+        "service rendu"
+      ]
+    },
+    {
+      "id": "v16-adulte-030",
+      "a": "Putsch",
+      "b": "Changement de bureau",
+      "difficulty": "hard",
+      "clueAxes": [
+        "place disputée",
+        "prise de contrôle"
+      ]
+    },
+    {
+      "id": "v16-adulte-031",
+      "a": "Immunité parlementaire",
+      "b": "Carte de sortie de prison",
+      "difficulty": "hard",
+      "clueAxes": [
+        "protection",
+        "poursuites évitées"
+      ]
+    },
+    {
+      "id": "v16-adulte-032",
+      "a": "Censure",
+      "b": "Dîner chez les beaux-parents",
+      "difficulty": "medium",
+      "clueAxes": [
+        "parole retenue",
+        "sujet interdit"
+      ]
+    },
+    {
+      "id": "v16-adulte-033",
+      "a": "Apocalypse",
+      "b": "Lundi matin",
+      "difficulty": "easy",
+      "clueAxes": [
+        "catastrophe redoutée",
+        "réveil brutal"
+      ]
+    },
+    {
+      "id": "v16-adulte-034",
+      "a": "Enfer",
+      "b": "Service client",
+      "difficulty": "easy",
+      "clueAxes": [
+        "attente interminable",
+        "épreuve"
+      ]
+    },
+    {
+      "id": "v16-adulte-035",
+      "a": "Purgatoire",
+      "b": "Salle d'attente",
+      "difficulty": "medium",
+      "clueAxes": [
+        "étape intermédiaire",
+        "patience"
+      ]
+    },
+    {
+      "id": "v16-adulte-036",
+      "a": "Vampire",
+      "b": "Banquier",
+      "difficulty": "easy",
+      "clueAxes": [
+        "ponction",
+        "contrat durable"
+      ]
+    },
+    {
+      "id": "v16-adulte-037",
+      "a": "Zombie",
+      "b": "Jeune parent",
+      "difficulty": "easy",
+      "clueAxes": [
+        "manque de sommeil",
+        "démarche automatique"
+      ]
+    },
+    {
+      "id": "v16-adulte-038",
+      "a": "Exorcisme",
+      "b": "Désinstallation de logiciel",
+      "difficulty": "hard",
+      "clueAxes": [
+        "intrus à expulser",
+        "procédure compliquée"
+      ]
+    },
+    {
+      "id": "v16-adulte-039",
+      "a": "Pacte avec le diable",
+      "b": "Crédit immobilier",
+      "difficulty": "medium",
+      "clueAxes": [
+        "engagement long",
+        "signature décisive"
+      ]
+    },
+    {
+      "id": "v16-adulte-040",
+      "a": "Jugement dernier",
+      "b": "Entretien annuel",
+      "difficulty": "hard",
+      "clueAxes": [
+        "bilan des actions",
+        "évaluation"
+      ]
+    }
+  ]
+}

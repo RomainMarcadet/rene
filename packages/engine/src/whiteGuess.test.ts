@@ -33,13 +33,28 @@ describe('conservative White spelling validation', () => {
     expect(normalizeGuess(' «   Carte d’IDENTITÉ ! » ')).toBe("carte d'identite");
     for (let i = 0; i < 10; i++) expect(isAcceptableWhiteGuess('balais', 'balai')).toBe(true);
   });
-  it('accepts every catalogue word exactly and never confuses two different catalogue words', () => {
-    const words = [...new Set(WORD_PAIRS.flatMap(pair => [pair.a, pair.b]))];
-    for (const expected of words) {
-      expect(isAcceptableWhiteGuess(expected, expected)).toBe(true);
-      for (const other of words.filter(word => normalizeGuess(word) !== normalizeGuess(expected))) {
-        expect(isAcceptableWhiteGuess(other, expected), `${other} != ${expected}`).toBe(false);
+  const references = new Map<string, string>();
+  for (const pair of WORD_PAIRS) for (const side of ['a', 'b'] as const) {
+    if (!references.has(pair[side])) references.set(pair[side], `${pair.id}:${side}`);
+  }
+  const words = [...references.keys()];
+  const normalized = words.map(normalizeGuess);
+  // Evaluate the same exhaustive, directed cross-product through the real validator.
+  // Normalize only once for the exclusion filter, avoid millions of assertion objects,
+  // and keep each batch within the normal test timeout. Diagnostics contain IDs only.
+  it.each(Array.from({ length: Math.ceil(words.length / 100) }, (_, index) => index))('accepts exact catalogue words and rejects every distinct word, batch %i', batch => {
+    let failures = 0;
+    const examples: { expected: string; proposal: string; kind: 'exact' | 'collision' }[] = [];
+    const record = (expected: number, proposal: number, kind: 'exact' | 'collision') => {
+      failures++;
+      if (examples.length < 20) examples.push({ expected: references.get(words[expected])!, proposal: references.get(words[proposal])!, kind });
+    };
+    for (let i = batch * 100; i < Math.min(words.length, (batch + 1) * 100); i++) {
+      if (!isAcceptableWhiteGuess(words[i], words[i])) record(i, i, 'exact');
+      for (let j = 0; j < words.length; j++) {
+        if (normalized[i] !== normalized[j] && isAcceptableWhiteGuess(words[j], words[i])) record(i, j, 'collision');
       }
     }
+    expect({ failures, examples }).toEqual({ failures: 0, examples: [] });
   });
 });
