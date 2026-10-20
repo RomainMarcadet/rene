@@ -221,15 +221,18 @@ test('stunned clue author keeps drafts and voice, then voting cancels every soci
       expect((await send(f.actors[0], { type: 'player.attack', kind: 'punch', targetId: host })).ok).toBe(true);
       if (i < 4) await page.waitForTimeout(820);
     }
+    await expect.poll(() => f.actors[0].snapshot?.social.players[host].physical?.kind).toBe('stun');
     await expect(page.locator('.social-controls')).toContainText('À terre');
-    const during = (await state(page)).game!;
-    expect(during).toEqual(business); expect(await peers()).toBe(initialPeers);
-    const stunEndsAt = (await state(page)).social.players[host].physical!.stunEndsAt;
+    const during = f.actors[0].snapshot!;
+    const stunEndsAt = during.social.players[host].physical!.stunEndsAt;
+    // Keep real typing inside the 2.5 s stun window. Inspect the observer's
+    // snapshot locally, and defer unrelated browser round trips until submission.
     await page.getByLabel('Votre indice', { exact: true }).fill('Indice fictif depuis le tapis');
-    await page.getByRole('button', { name: /Valider mon indice/ }).click();
+    await page.keyboard.press('Enter');
     await expect(page.locator('.latest-clue')).toContainText('Indice fictif depuis le tapis');
     await expect.poll(() => f.actors[0].contributions.get(host + ':' + business.round)).toBeDefined();
     expect(f.actors[0].contributions.get(host + ':' + business.round)).toBeLessThan(stunEndsAt);
+    expect(during.game).toEqual(business); expect(await peers()).toBe(initialPeers);
     await page.screenshot({ path: 'output/playwright/v1.5-clue-while-stunned.png' });
     await expect(page.getByLabel('Message au salon')).toHaveValue('Brouillon conservé pendant les cabrioles');
     while ((await state(page)).game!.phase === 'description') {
