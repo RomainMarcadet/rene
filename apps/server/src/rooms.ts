@@ -1,6 +1,6 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import {
-  ANIMATIONS, DEFAULT_SETTINGS, validComposition, canMoveInPhase, voteSeat, SALON_BOUNDS, TABLE_BLOCKER, isSocialCommand, socialMovementAllowed, type AvatarAppearance, type ChatMessage, type ChatReaction,
+  ANIMATIONS, DEFAULT_SETTINGS, validComposition, canMoveInPhase, voteSeat, SALON_BOUNDS, walkable, clearWorldPath, spawnPoint, isSocialCommand, socialMovementAllowed, type AvatarAppearance, type ChatMessage, type ChatReaction,
   type Command, type PublicPlayer, type RoomSettings, type RoomSnapshot, type PrivatePlayerState,
 } from '@rene/contracts';
 import { createGame, applyGameAction, chooseWordPair, publicGame, privateGame, type GameState } from '@rene/engine';
@@ -49,10 +49,9 @@ export class Rooms {
     if (room.players.has(guest.id)) { this.connected(room, guest.id, now); return; }
     if (room.players.size >= 12) throw new Error('Ce salon accueille déjà 12 personnes.');
     const index = room.players.size;
-    const angle = index * Math.PI * 2 / 12;
     const waiting = !editable(room);
     room.formerPlayers.delete(guest.id);
-    room.players.set(guest.id, { social: createSocialPlayer(), id: guest.id, name: guest.name, appearance: guest.appearance, connected: true, ready: false, position: { x: Math.cos(angle) * 4, z: Math.sin(angle) * 4, yaw: 0 }, alive: !waiting, waiting, score: room.scores.get(guest.id) ?? 0, joinedAt: now, disconnectedAt: null, lastMoveAt: now, lastChatAt: -Infinity, lastEmoteAt: -Infinity });
+    room.players.set(guest.id, { social: createSocialPlayer(), id: guest.id, name: guest.name, appearance: guest.appearance, connected: true, ready: false, position: spawnPoint(index), alive: !waiting, waiting, score: room.scores.get(guest.id) ?? 0, joinedAt: now, disconnectedAt: null, lastMoveAt: now, lastChatAt: -Infinity, lastEmoteAt: -Infinity });
     this.playerRooms.set(guest.id, room.code);
     room.lastOccupiedAt = now;
     // Any roster change cancels readiness; waiting arrivals cannot change an active game.
@@ -241,8 +240,8 @@ export class Rooms {
     const magnitude = Math.max(1, Math.hypot(direction.x, direction.z));
     const x = Math.max(-SALON_BOUNDS.x, Math.min(SALON_BOUNDS.x, player.position.x + direction.x / magnitude * dt * 3.2));
     const z = Math.max(-SALON_BOUNDS.z, Math.min(SALON_BOUNDS.z, player.position.z + direction.z / magnitude * dt * 3.2));
-    // Shared scene table has a 2.6 x 1.6 footprint; keep avatars outside it.
-    if (Math.abs(x) < TABLE_BLOCKER.x && Math.abs(z) < TABLE_BLOCKER.z) return false;
+    // Swept movement and social line of sight share the visible furniture footprints.
+    if (!walkable({ x, z }) || !clearWorldPath(player.position, { x, z })) return false;
     if ((direction.x || direction.z) && player.social.animation && !ANIMATIONS[player.social.animation.kind].moving) {
       cancelVoluntary(room, player); room.revision++;
     }

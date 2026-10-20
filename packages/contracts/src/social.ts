@@ -87,18 +87,9 @@ export function isGrounded(player: { alive: boolean; waiting: boolean }, state: 
 export function socialMovementAllowed(state: SocialPlayerState | undefined, now: number) { return !state?.physical || state.physical.kind !== 'stun' || now >= state.physical.endsAt; }
 export const isSocialCommand = (type: string) => type === 'player.emote' || type === 'player.emote.stop' || type === 'player.attack' || type.startsWith('player.interaction.');
 
-export const SALON_BOUNDS = { x: 7, z: 5 } as const;
-export const TABLE_BLOCKER = { x: 1.65, z: 1.15 } as const;
-/** Segment / inflated table intersection, using the same footprint as movement. */
-export function clearSocialPath(a: Position, b: Position) {
-  let low = 0; let high = 1;
-  for (const axis of ['x', 'z'] as const) {
-    const d = b[axis] - a[axis]; const extent = TABLE_BLOCKER[axis];
-    if (Math.abs(d) < 1e-8) { if (Math.abs(a[axis]) > extent) return true; }
-    else { const t1 = (-extent - a[axis]) / d; const t2 = (extent - a[axis]) / d; low = Math.max(low, Math.min(t1, t2)); high = Math.min(high, Math.max(t1, t2)); }
-  }
-  return high < low || high < 0 || low > 1;
-}
+export { SALON_BOUNDS, TABLE_BLOCKER } from './world.js';
+import { clearWorldPath } from './world.js';
+export const clearSocialPath = (a: Position, b: Position) => clearWorldPath(a, b);
 export function withinSocialReach(a: Position, b: Position, range: number = SOCIAL_COMBAT_CONFIG.range, facing = true) {
   const dx = b.x - a.x; const dz = b.z - a.z; const distance = Math.hypot(dx, dz);
   return distance <= range && clearSocialPath(a, b) && (!facing || distance < .01 || (dx * Math.sin(a.yaw) + dz * Math.cos(a.yaw)) / distance >= SOCIAL_COMBAT_CONFIG.facingCosine);

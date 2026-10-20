@@ -3,6 +3,7 @@ import { AppearanceSchema, type AvatarAppearance } from './appearance.js';
 export * from './appearance.js';
 export * from './playerMarks.js';
 export * from './social.js';
+export * from './world.js';
 import { AnimationIdSchema, AttackKindSchema, type SocialSnapshot } from './social.js';
 export const SettingsSchema = z.object({
   automaticRoles: z.boolean(), undercoverCount: z.number().int().min(0).max(10), whiteCount: z.number().int().min(0).max(10),
