@@ -52,4 +52,18 @@ describe('room theme enforcement', () => {
     expect(eligible).toContain(room.usedWords.at(-1));
     expect(room.usedWords).toHaveLength(eligible.length);
   });
+
+  it('synchronizes a special-only selection and starts a game without publishing the pair', async () => {
+    const { rooms, room } = await fixture();
+    const settings = { ...DEFAULT_SETTINGS, categories: ['special'] as 'special'[] };
+    await rooms.command(room, 'host', { type: 'settings.update', settings }, 2);
+    expect(rooms.snapshot(room, 3).settings.categories).toEqual(['special']);
+    for (const id of room.players.keys()) await rooms.command(room, id, { type: 'player.ready', ready: true }, 4);
+    await rooms.command(room, 'host', { type: 'game.start' }, 5);
+    const pool = matchingWordPairs(settings);
+    expect(pool.some(pair => pair.id === room.usedWords.at(-1))).toBe(true);
+    const snapshot = JSON.stringify(rooms.snapshot(room, 6));
+    expect(pool.some(pair => snapshot.includes(pair.a) || snapshot.includes(pair.b) || snapshot.includes(pair.id))).toBe(false);
+    expect(snapshot.includes('clueAxes')).toBe(false);
+  });
 });

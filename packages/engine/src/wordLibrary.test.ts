@@ -1,21 +1,21 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS, PUBLIC_WORD_CATEGORIES } from '@rene/contracts';
+import { DEFAULT_SETTINGS } from '@rene/contracts';
 import { WORD_PAIRS, NEW_WORD_PAIRS, LEGACY_WORD_PAIRS, WORD_HISTORY_LIMIT, auditWordLibrary, chooseWordPair, libraryStatistics, normalizeWordKey, pairKey, recordWordSelection, type WordPair } from './words.js';
 import { createGame, privateGame, publicGame } from './game.js';
 import { isAcceptableWhiteGuess } from './whiteGuess.js';
 import review from './editorial-review.json';
 
-const categories = PUBLIC_WORD_CATEGORIES;
 const originalNew = NEW_WORD_PAIRS.filter(pair => pair.id.startsWith('v14-'));
 // The only category reclassification does not change the original editorial balance.
 const originalCategories = originalNew.map(pair => pair.category === 'adulte' ? { ...pair, category: 'politique' as const } : pair);
+const categories = [...new Set(originalCategories.map(pair => pair.category))];
 const fake = (count: number): WordPair[] => Array.from({ length: count }, (_, i) => ({ id: `fixture-${i}`, a: `Objet fictif A ${i}`, b: `Objet fictif B ${i}`, category: 'nature', difficulty: 'easy' }));
 function seeded(seed = 314159) { return () => { seed = (1664525 * seed + 1013904223) >>> 0; return seed / 2 ** 32; }; }
 
 describe('word catalogue, spoiler-free diagnostics', () => {
   it('adds 1500 curated pairs and preserves the original 120 verbatim', () => {
-    expect(originalNew.length).toBe(1500); expect(NEW_WORD_PAIRS.length).toBe(1539); expect(WORD_PAIRS.length).toBe(1659);
+    expect(originalNew.length).toBe(1500); expect(NEW_WORD_PAIRS.length).toBe(1546); expect(WORD_PAIRS.length).toBe(1666);
     expect(createHash('sha256').update(JSON.stringify(originalNew.map(p => [p.id, p.a, p.b]).sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))).digest('hex')).toBe('043ef686e067af704b652dea3158c779e5c4a4162dc101d7808f76f573a20fae');
     expect(LEGACY_WORD_PAIRS.length).toBe(120);
     expect(createHash('sha256').update(JSON.stringify(LEGACY_WORD_PAIRS)).digest('hex')).toBe('edf64519fad81446e223af9515f95496c5148aedf392bdd8fb4d1fa11ae71a20');

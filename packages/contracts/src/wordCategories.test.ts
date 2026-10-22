@@ -16,6 +16,15 @@ describe('word theme settings', () => {
     expect(wordSelectionLabel({ category: 'nature', categories: ['sport', 'cinema'] })).toBe('Sport · Cinéma');
   });
 
+  it('accepts and labels the special theme without changing the default selection', () => {
+    const settings = SettingsSchema.parse({ ...DEFAULT_SETTINGS, categories: ['special'] });
+    expect(selectedWordCategories(settings)).toEqual(['special']);
+    expect(wordSelectionLabel(settings)).toBe('Spécial');
+    expect(selectedWordCategories(DEFAULT_SETTINGS)).not.toContain('special');
+    expect(selectedWordCategories({ category: 'special' })).toEqual(['special']);
+    expect(CommandSchema.safeParse({ type: 'settings.update', settings }).success).toBe(true);
+  });
+
   it('requires adult opt-in even when a crafted selection includes that theme', () => {
     expect(selectedWordCategories({ category: 'adulte', adultContent: false })).toEqual([]);
     expect(selectedWordCategories({ category: 'all', categories: ['nature', 'adulte'] })).toEqual(['nature']);
