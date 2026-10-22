@@ -13,7 +13,7 @@ const fixture: readonly WordPair[] = [
 describe('server-only word themes', () => {
   it('audits the complete library without exposing editorial text in diagnostics', () => {
     expect(LEGACY_WORD_PAIRS).toHaveLength(120);
-    expect(WORD_PAIRS).toHaveLength(1659);
+    expect(WORD_PAIRS).toHaveLength(1667);
     expect(WORD_PAIRS.filter(pair => pair.category === 'adulte')).toHaveLength(40);
     expect(auditWordLibrary(WORD_PAIRS)).toEqual([]);
     for (const pair of LEGACY_WORD_PAIRS) expect(JSON.stringify(WORD_PAIRS.find(item => item.id === pair.id)) === JSON.stringify(pair), pair.id).toBe(true);
@@ -31,7 +31,7 @@ describe('server-only word themes', () => {
 
   it('excludes every adult association from defaults and from all classic-only filters', () => {
     const defaults = matchingWordPairs({ ...DEFAULT_SETTINGS, categories: [] });
-    expect(defaults).toHaveLength(1619);
+    expect(defaults).toHaveLength(1627);
     expect(defaults.every(pair => pair.category !== 'adulte')).toBe(true);
     for (const category of PUBLIC_WORD_CATEGORIES) {
       expect(matchingWordPairs({ ...DEFAULT_SETTINGS, categories: [], category }).every(pair => pair.category === category)).toBe(true);
@@ -47,6 +47,24 @@ describe('server-only word themes', () => {
     expect(chooseWordPair(settings, [], () => .99, fixture).id).toBe('fixture-cinema');
     expect(matchingWordPairs({ ...settings, categories: ['adulte'], adultContent: true }, fixture).map(pair => pair.id)).toEqual(['fixture-adult']);
     expect(matchingWordPairs({ ...settings, adultContent: true }, fixture).some(pair => pair.category === 'adulte')).toBe(false);
+  });
+
+  it('selects all special entries without repeats and keeps their editorial evidence server-side', () => {
+    const settings = { ...DEFAULT_SETTINGS, categories: ['special'] as const };
+    const pool = matchingWordPairs(settings);
+    expect(pool.map(pair => pair.id)).toEqual(Array.from({ length: 8 }, (_, i) => `v16-special-${String(i + 1).padStart(3, '0')}`));
+    expect(pool.every(pair => pair.category === 'special' && pair.clueAxes?.length === 2)).toBe(true);
+    expect(matchingWordPairs(DEFAULT_SETTINGS).some(pair => pair.category === 'special')).toBe(false);
+    const history: string[] = [];
+    for (let cycle = 0; cycle < 2; cycle++) {
+      const selected = new Set<string>();
+      for (let i = 0; i < pool.length; i++) {
+        const pair = chooseWordPair(settings, history, () => .42);
+        expect(history.at(-1)).not.toBe(pair.id);
+        selected.add(pair.id); recordWordSelection(history, pair.id);
+      }
+      expect(selected.size).toBe(pool.length);
+    }
   });
 
   it('keeps all no-repeat cycles and handles filters changing and a one-pair pool', () => {

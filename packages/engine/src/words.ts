@@ -18,11 +18,12 @@ import pack12 from './word-data/technologie.json';
 import pack13 from './word-data/histoire.json';
 import pack14 from './word-data/sciences.json';
 import adultPack from './word-data/adulte.json';
+import specialPack from './word-data/special.json';
 export type { WordPair } from './wordTypes.js';
 export { LEGACY_WORD_PAIRS } from './legacyWords.js';
 export { auditWordLibrary, libraryStatistics, normalizeWordKey, pairKey } from './wordAudit.js';
 
-const packs = [pack0, pack1, pack2, pack3, pack4, pack5, pack6, pack7, pack8, pack9, pack10, pack11, pack12, pack13, pack14, adultPack];
+const packs = [pack0, pack1, pack2, pack3, pack4, pack5, pack6, pack7, pack8, pack9, pack10, pack11, pack12, pack13, pack14, adultPack, specialPack];
 export const NEW_WORD_PAIRS: readonly WordPair[] = Object.freeze(packs.flatMap(pack =>
   pack.pairs.map(pair => Object.freeze({ ...pair, category: pack.category as WordPair['category'], difficulty: pair.difficulty as WordPair['difficulty'], clueAxes: Object.freeze([...pair.clueAxes]) })),
 ));

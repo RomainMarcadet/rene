@@ -1,14 +1,14 @@
 import { z } from 'zod';
 
 /** Public labels only. The associated word pairs stay on the server. */
-export const WORD_CATEGORY_IDS = ['quotidien', 'nature', 'cuisine', 'culture', 'voyage', 'cinema', 'jeux-video', 'internet', 'musique', 'sport', 'politique', 'television', 'technologie', 'histoire', 'sciences', 'adulte'] as const;
+export const WORD_CATEGORY_IDS = ['quotidien', 'nature', 'cuisine', 'culture', 'voyage', 'cinema', 'jeux-video', 'internet', 'musique', 'sport', 'politique', 'television', 'technologie', 'histoire', 'sciences', 'special', 'adulte'] as const;
 export const WordCategorySchema = z.enum(WORD_CATEGORY_IDS);
 export type WordCategory = z.infer<typeof WordCategorySchema>;
 export const WORD_CATEGORY_LABELS: Record<WordCategory, string> = {
   quotidien: 'Quotidien', nature: 'Nature', cuisine: 'Cuisine', culture: 'Culture', voyage: 'Voyage',
   cinema: 'Cinéma', 'jeux-video': 'Jeux vidéo', internet: 'Internet', musique: 'Musique', sport: 'Sport',
   politique: 'Politique', television: 'Télévision', technologie: 'Technologie', histoire: 'Histoire & imaginaire',
-  sciences: 'Sciences', adulte: '18+ · Politique & humour noir',
+  sciences: 'Sciences', special: 'Spécial', adulte: '18+ · Politique & humour noir',
 };
 export const PUBLIC_WORD_CATEGORIES = WORD_CATEGORY_IDS.filter(category => category !== 'adulte');
 /** References likely to be shared in a contemporary social-game night; never includes 18+. */
