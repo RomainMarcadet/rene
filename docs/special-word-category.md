@@ -4,9 +4,9 @@ Ajout du thème public `special`, affiché « Spécial » dans les paramètres e
 
 ## Catalogue
 
-Sept associations fournies par le propriétaire sont enregistrées dans `packages/engine/src/word-data/special.json`, avec identifiants stables, niveaux de difficulté et deux axes d'indice par entrée. Aucune association n'est reproduite dans ce rapport. La huitième proposition attend une précision sur un nom avant son ajout.
+Huit associations fournies par le propriétaire sont enregistrées dans `packages/engine/src/word-data/special.json`, avec identifiants stables, niveaux de difficulté et deux axes d'indice par entrée. Aucune association n'est reproduite dans ce rapport. Le nom de la dernière proposition est conservé tel que confirmé par le propriétaire.
 
-Le catalogue contient désormais 1 666 paires, dont 1 546 ajouts et 120 paires historiques conservées à l'identique. Le thème Spécial contient 2 paires faciles, 3 moyennes et 2 difficiles. Ce lot éditorial ciblé ne modifie pas la répartition du lot initial de 1 500 nouvelles paires.
+Le catalogue contient désormais 1 667 paires, dont 1 547 ajouts et 120 paires historiques conservées à l'identique. Le thème Spécial contient 2 paires faciles, 3 moyennes et 3 difficiles. Ce lot éditorial ciblé ne modifie pas la répartition du lot initial de 1 500 nouvelles paires.
 
 ## Architecture et confidentialité
 
@@ -21,5 +21,6 @@ Les tests couvrent la validation et le libellé du thème, la conservation du pr
 - `npm run build`, `npm run words:check` et `npm run words:boundary` : réussis, zéro anomalie de catalogue et zéro fuite détectée dans les neuf assets client contrôlés.
 - `npm run test:e2e -- tests/e2e/wordLibrary.spec.ts` : réussi, avec quatre clients, affichage du nouveau thème, distribution privée sur catalogue fictif et blocage des imports HTTP des fichiers de mots.
 - Les autres scénarios E2E et LiveKit ne sont pas relancés pour cet ajout de contenu.
+- Après confirmation et ajout de la huitième proposition : les trois suites ciblées catalogue et sélection de salle passent, soit 21 tests. La compilation et le scénario navigateur ci-dessus ont été exécutés sur la version à sept entrées ; seule la donnée et les décomptes associés changent ensuite.
 
 Aucun déploiement ni fusion automatique.

@@ -15,7 +15,7 @@ function seeded(seed = 314159) { return () => { seed = (1664525 * seed + 1013904
 
 describe('word catalogue, spoiler-free diagnostics', () => {
   it('adds 1500 curated pairs and preserves the original 120 verbatim', () => {
-    expect(originalNew.length).toBe(1500); expect(NEW_WORD_PAIRS.length).toBe(1546); expect(WORD_PAIRS.length).toBe(1666);
+    expect(originalNew.length).toBe(1500); expect(NEW_WORD_PAIRS.length).toBe(1547); expect(WORD_PAIRS.length).toBe(1667);
     expect(createHash('sha256').update(JSON.stringify(originalNew.map(p => [p.id, p.a, p.b]).sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))).digest('hex')).toBe('043ef686e067af704b652dea3158c779e5c4a4162dc101d7808f76f573a20fae');
     expect(LEGACY_WORD_PAIRS.length).toBe(120);
     expect(createHash('sha256').update(JSON.stringify(LEGACY_WORD_PAIRS)).digest('hex')).toBe('edf64519fad81446e223af9515f95496c5148aedf392bdd8fb4d1fa11ae71a20');

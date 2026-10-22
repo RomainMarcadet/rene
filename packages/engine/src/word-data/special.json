@@ -2,12 +2,85 @@
   "version": 1,
   "category": "special",
   "pairs": [
-    { "id": "v16-special-001", "a": "Le petit Grégory", "b": "Ancre", "difficulty": "hard", "clueAxes": ["eau", "poids"] },
-    { "id": "v16-special-002", "a": "Barbecue", "b": "Crémation", "difficulty": "medium", "clueAxes": ["feu", "chaleur"] },
-    { "id": "v16-special-003", "a": "Hitler", "b": "Netanyahou", "difficulty": "medium", "clueAxes": ["dirigeant politique", "conflit armé"] },
-    { "id": "v16-special-004", "a": "Mbappé", "b": "Yamal", "difficulty": "easy", "clueAxes": ["football", "attaquant"] },
-    { "id": "v16-special-005", "a": "Harry Potter", "b": "Seigneur des Anneaux", "difficulty": "easy", "clueAxes": ["saga fantastique", "adaptation au cinéma"] },
-    { "id": "v16-special-006", "a": "Écologisme", "b": "Racisme", "difficulty": "hard", "clueAxes": ["idéologie", "débat public"] },
-    { "id": "v16-special-007", "a": "Macron", "b": "Bachar el-Assad", "difficulty": "medium", "clueAxes": ["président", "politique"] }
+    {
+      "id": "v16-special-001",
+      "a": "Le petit Grégory",
+      "b": "Ancre",
+      "difficulty": "hard",
+      "clueAxes": [
+        "eau",
+        "poids"
+      ]
+    },
+    {
+      "id": "v16-special-002",
+      "a": "Barbecue",
+      "b": "Crémation",
+      "difficulty": "medium",
+      "clueAxes": [
+        "feu",
+        "chaleur"
+      ]
+    },
+    {
+      "id": "v16-special-003",
+      "a": "Hitler",
+      "b": "Netanyahou",
+      "difficulty": "medium",
+      "clueAxes": [
+        "dirigeant politique",
+        "conflit armé"
+      ]
+    },
+    {
+      "id": "v16-special-004",
+      "a": "Mbappé",
+      "b": "Yamal",
+      "difficulty": "easy",
+      "clueAxes": [
+        "football",
+        "attaquant"
+      ]
+    },
+    {
+      "id": "v16-special-005",
+      "a": "Harry Potter",
+      "b": "Seigneur des Anneaux",
+      "difficulty": "easy",
+      "clueAxes": [
+        "saga fantastique",
+        "adaptation au cinéma"
+      ]
+    },
+    {
+      "id": "v16-special-006",
+      "a": "Écologisme",
+      "b": "Racisme",
+      "difficulty": "hard",
+      "clueAxes": [
+        "idéologie",
+        "débat public"
+      ]
+    },
+    {
+      "id": "v16-special-007",
+      "a": "Macron",
+      "b": "Bachar el-Assad",
+      "difficulty": "medium",
+      "clueAxes": [
+        "président",
+        "politique"
+      ]
+    },
+    {
+      "id": "v16-special-008",
+      "a": "Burce",
+      "b": "Staline",
+      "difficulty": "hard",
+      "clueAxes": [
+        "association de groupe",
+        "référence privée"
+      ]
+    }
   ]
 }
