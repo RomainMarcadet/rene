@@ -4,6 +4,8 @@ Un salon peuplé de personnages absurdes, des mots presque identiques et des ami
 
 Le serveur distribue les mots, valide les actions, anime les phases et attribue les scores. Les joueurs rejoignent une vraie salle Socket.IO : les avatars, déplacements, descriptions, votes et résultats sont partagés entre navigateurs. Le vocal utilise LiveKit, le chat reste disponible sans microphone.
 
+**Technologies :** TypeScript, React, Three.js, Fastify, Socket.IO, PostgreSQL, Prisma et LiveKit. Le moteur de jeu et les validations côté serveur sont séparés de l'interface ; la section [Structure et limites](#structure-et-limites-de-cette-version) précise l'architecture et les restrictions actuelles.
+
 ## Démarrer en développement
 
 Prérequis : Node.js **24 LTS**, npm et Docker Compose v2 pour PostgreSQL et LiveKit.
